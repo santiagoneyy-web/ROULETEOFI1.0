@@ -2,15 +2,15 @@
   "tables": [
     {
       "id": 1,
-      "name": "Betano Immersive Deluxe",
-      "provider": "Betano",
-      "url": "https://www.betano.pe/casino/live/games/immersive-roulette-deluxe/23563/tables/"
+      "name": "Auto Speed Roulette",
+      "provider": "Evolution",
+      "url": "https://gamblingcounting.com/evolution-speed-roulette"
     },
     {
       "id": 2,
-      "name": "Olimpo Ruleta",
-      "provider": "Olimpo",
-      "url": "https://www.olimpo.bet/casino-en-vivo?machine=5002830"
+      "name": "Inmersive Roulette",
+      "provider": "Evolution",
+      "url": "https://www.casino.org/casinoscores/es/immersive-roulette/"
     }
   ],
   "spins": [

@@ -124,51 +124,59 @@ async function startScraper() {
             try {
                 if (page.isClosed()) return;
                 
-                // Extract spins from the DOM
-                const data = await page.evaluate(() => {
-                    let extracted = [];
-                    // Try various selectors used by common stats sites
-                    const selectors = [
-                        '.roulette-number', 
-                        '.number-box', 
-                        '.last-numbers .number',
-                        '[data-slot="badge"]',
-                        '.roulette-history-item',
-                        '.recent-numbers .num'
-                    ];
-                    
-                    let elements = [];
-                    for (const sel of selectors) {
-                        const found = document.querySelectorAll(sel);
-                        if (found && found.length > 0) {
-                            elements = Array.from(found);
-                            break;
-                        }
-                    }
+                // --- EXTRACTION LOGIC (Search all frames) ---
+                let data = [];
+                const frames = page.frames();
 
-                    if (elements.length > 0) {
-                        for (let el of elements.slice(0, 10)) {
-                            const text = el.innerText.trim();
-                            // Precise match: must be only a number 0-36
-                            const numMatch = text.match(/^([0-9]|[12][0-9]|3[0-6])$/);
-                            if (numMatch) {
-                                extracted.push(parseInt(numMatch[1]));
+                for (const frame of frames) {
+                    try {
+                        const frameData = await frame.evaluate(() => {
+                            let extracted = [];
+                            const selectors = [
+                                '.roulette-number', '.number-box', '.last-numbers .number',
+                                '[data-slot="badge"]', '.roulette-history-item', '.recent-numbers .num',
+                                '.history-item', '.stats-number', '.ball-number', '.last-spin'
+                            ];
+                            
+                            let elements = [];
+                            for (const sel of selectors) {
+                                try {
+                                    const found = document.querySelectorAll(sel);
+                                    if (found && found.length > 0) {
+                                        elements = Array.from(found);
+                                        break; 
+                                    }
+                                } catch(e) {}
                             }
+
+                            if (elements.length > 0) {
+                                for (let el of elements.slice(0, 15)) {
+                                    const text = (el.innerText || el.textContent || '').trim();
+                                    // Strict Number extraction (0-36)
+                                    const numMatch = text.match(/^([0-9]|[12][0-9]|3[0-6])$/);
+                                    if (numMatch) {
+                                        extracted.push(parseInt(numMatch[1]));
+                                    }
+                                }
+                            }
+                            return extracted;
+                        });
+
+                        if (frameData && frameData.length > 0) {
+                            data = frameData;
+                            break; 
                         }
-                    }
-                    return extracted;
-                });
+                    } catch (frameErr) {}
+                }
 
                 if (data && data.length > 0) {
-                    errorCount = 0; // Reset error count on success
+                    errorCount = 0; 
                     const latestNumber = data[0];
                     const historyStr = data.slice(0, 5).join(',');
 
-                    // Only update if the sequence changed (handles same-number-twice case)
                     if (historyStr !== this.lastHistoryStr) {
                         console.log(`✨ NEW DATA DETECTED [Table ${TABLE_ID}] -> Numbers: ${historyStr}`);
                         
-                        // We only post if the newest number is different or the sequence shifted
                         if (latestNumber !== lastKnownNumber || historyStr !== this.lastHistoryStr) {
                              console.log(`🚀 POSTING NEW SPIN: ${latestNumber}`);
                              try {
@@ -186,7 +194,7 @@ async function startScraper() {
                     }
                 } else {
                     errorCount++;
-                    if (errorCount > 5) {
+                    if (errorCount > 8) { // Aggressive reload for speed roulette
                         console.log("⚠️ No numbers detected for a while. Reloading page...");
                         await page.reload({ waitUntil: 'networkidle2' });
                         errorCount = 0;
@@ -212,7 +220,6 @@ async function startScraper() {
     } catch (err) {
         console.error("💥 Fatal Bot Error:", err.message);
         if (browser) await browser.close();
-        // Restart after a delay
         setTimeout(startScraper, 30000);
     }
 }
