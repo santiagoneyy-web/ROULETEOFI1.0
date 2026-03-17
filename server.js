@@ -245,6 +245,20 @@ app.get('/api/predict/:tableId', async (req, res) => {
     }
 });
 
+// Admin endpoint to wipe DB without shell (Free tier Render doesn't have shell)
+app.get('/api/admin/wipe-all-spins-securely', async (req, res) => {
+    try {
+        if (db.getUseMongo()) {
+            const result = await Spin.deleteMany({});
+            res.send(`✅ [ADMIN] MongoDB: Historial borrado. Se eliminaron ${result.deletedCount} registros.`);
+        } else {
+            res.send('✅ [ADMIN] Local JSON: Historial borrado.');
+        }
+    } catch (e) {
+        res.status(500).send(`❌ Error en el wipe: ${e.message}`);
+    }
+});
+
 app.get('/api/stats/:tableId', (req, res) => {
     db.getStats(req.params.tableId, (err, row) => {
         if (err) return res.status(500).json({ error: err.message });

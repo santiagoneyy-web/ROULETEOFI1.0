@@ -4,8 +4,7 @@
   "main": "app.js",
   "scripts": {
     "start": "node start.js",
-    "build": "echo \"Building app...\"",
-    "postinstall": "npx puppeteer browsers install chrome",
+    "build": "npm install && npx puppeteer browsers install chrome",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "type": "commonjs",
