@@ -275,13 +275,22 @@ app.get('/api/stats/:tableId', (req, res) => {
 });
 
 // ---- Start ----
-const server = app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', async () => {
     console.log(`\n🎰 Roulette Predictor Server running at http://0.0.0.0:${PORT}`);
     console.log(`   API ready at:          http://0.0.0.0:${PORT}/api/\n`);
     
-    // 🔥 CRITICAL FIX: Only spawn the bots AFTER Render confirms the port is open!
-    // This prevents the CPU-heavy bots from blocking the Node event loop
-    // during Render's critical startup port scan.
+    // 🔥 CRITICAL: Update table names if they exist but have old names (for Mongo)
+    if (db.getUseMongo()) {
+        try {
+            const Table = require('./models/Table');
+            await Table.updateOne({ id: 1 }, { $set: { name: 'Auto Speed Roulette', url: 'https://gamblingcounting.com/evolution-roulette' } });
+            await Table.updateOne({ id: 2 }, { $set: { name: 'Inmersive Roulette', url: 'https://www.casino.org/casinoscores/es/immersive-roulette/' } });
+            console.log('✅ [BOOT] Table names synchronized with focused config.');
+        } catch (e) {
+            console.error('❌ [BOOT] Table sync error:', e.message);
+        }
+    }
+
     if (!process.env.DISABLE_BOTS) {
         require('./start-bots.js')(PORT);
     }

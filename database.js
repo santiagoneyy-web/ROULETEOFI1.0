@@ -12,8 +12,8 @@ let useMongo = false;
 // Memory cache for fallback
 let fallbackData = {
     tables: [
-        { id: 1, name: 'Betano Immersive Deluxe', provider: 'Betano', url: 'https://www.betano.pe/casino/live/games/immersive-roulette-deluxe/23563/tables/' },
-        { id: 2, name: 'Olimpo Ruleta', provider: 'Olimpo', url: 'https://www.olimpo.bet/casino-en-vivo?machine=5002830' }
+        { id: 1, name: 'Auto Speed Roulette', provider: 'Evolution', url: 'https://gamblingcounting.com/evolution-roulette' },
+        { id: 2, name: 'Inmersive Roulette', provider: 'Evolution', url: 'https://www.casino.org/casinoscores/es/immersive-roulette/' }
     ],
     spins: []
 };

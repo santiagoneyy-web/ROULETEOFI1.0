@@ -89,10 +89,24 @@ async function startScraper() {
     
     // Block images, css, and fonts to save memory and bypass ad-heavy sites
     await page.setRequestInterception(true);
+    
+    // Aggressive Ad-Blocking Domains
+    const blockedDomains = [
+        'googlesyndication.com', 'adservice.google.com', 'google-analytics.com',
+        'doubleclick.net', 'adnxs.com', 'taboola.com', 'outbrain.com',
+        'amazon-adsystem.com', 'facebook.net', 'fontawesome.com', 'gravatar.com',
+        'hotjar.com', 'quantserve.com', 'scorecardresearch.com', 'pubmatic.com',
+        'rubiconproject.com', 'criteo.com', 'openx.net', 'adroll.com'
+    ];
+
     page.on('request', (req) => {
+        const url = req.url().toLowerCase();
         const type = req.resourceType();
-        // Block media and styles. Allow scripts just in case the data is rendered by JS/React.
-        if (['image', 'stylesheet', 'font', 'media'].includes(type) || req.url().includes('ads')) {
+        
+        const isAd = blockedDomains.some(d => url.includes(d));
+        const isMedia = ['image', 'stylesheet', 'font', 'media', 'webmanifest'].includes(type);
+        
+        if (isAd || isMedia || url.includes('ads') || url.includes('tracking') || url.includes('pixel')) {
             req.abort();
         } else {
             req.continue();
