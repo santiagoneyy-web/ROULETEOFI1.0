@@ -267,7 +267,14 @@ app.get('/api/stats/:tableId', (req, res) => {
 });
 
 // ---- Start ----
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🎰 Roulette Predictor Server running at http://0.0.0.0:${PORT}`);
     console.log(`   API ready at:          http://0.0.0.0:${PORT}/api/\n`);
+    
+    // 🔥 CRITICAL FIX: Only spawn the bots AFTER Render confirms the port is open!
+    // This prevents the CPU-heavy bots from blocking the Node event loop
+    // during Render's critical startup port scan.
+    if (!process.env.DISABLE_BOTS) {
+        require('./start-bots.js')(PORT);
+    }
 });
