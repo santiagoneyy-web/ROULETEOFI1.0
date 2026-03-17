@@ -17,8 +17,8 @@ const getArg = (name, def) => {
 // Defaults to Immersive
 const TABLE_ID  = getArg('--table', '1');
 const TARGET_URL = getArg('--url', 'https://www.casino.org/casinoscores/es/immersive-roulette/');
-const API_URL    = getArg('--api', 'http://localhost:3000/api/spin');
-const INTERVAL   = parseInt(getArg('--interval', '15000')); // Check every 15s to avoid rate limits
+const API_URL    = getArg('--api', 'http://0.0.0.0:10000/api/spin');
+const INTERVAL   = parseInt(getArg('--interval', '15000'));
 
 let lastKnownTimestamp = null;
 let lastKnownNumber = null;
