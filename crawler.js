@@ -91,12 +91,13 @@ async function poll() {
         });
 
         const body = response.data;
-        // The API returns: { content: [ { id, data: { outcome: { number }, settledAt } }, ... ] }
+
+        // casino.org API returns a plain array directly: [{id, data:{result:{outcome:{number}}}, ...}]
         let events = [];
-        if (body && Array.isArray(body.content)) {
-            events = body.content;
-        } else if (Array.isArray(body)) {
+        if (Array.isArray(body)) {
             events = body;
+        } else if (body && Array.isArray(body.content)) {
+            events = body.content;  // fallback if wrapped
         }
 
         if (!events.length) {
@@ -110,11 +111,15 @@ async function poll() {
 
         // Most recent event is first (sorted by settledAt desc)
         const latestEvent = events[0];
-        const eventId = latestEvent.id || latestEvent.data?.id;
-        const number = latestEvent.data?.outcome?.number ?? latestEvent.data?.number ?? latestEvent.outcome?.number;
+        const eventId = latestEvent.id;
+
+        // PATH: data.result.outcome.number  (confirmed from live API)
+        const number = latestEvent?.data?.result?.outcome?.number;
 
         if (number === undefined || number === null) {
-            console.log(`⚠️ [T${TABLE_ID}] Could not parse number from event. Keys: ${JSON.stringify(Object.keys(latestEvent))}`);
+            const keys = JSON.stringify(Object.keys(latestEvent));
+            const dataKeys = latestEvent.data ? JSON.stringify(Object.keys(latestEvent.data)) : 'no data';
+            console.log(`⚠️ [T${TABLE_ID}] No number found. TopKeys:${keys} DataKeys:${dataKeys}`);
             setTimeout(poll, INTERVAL);
             return;
         }
