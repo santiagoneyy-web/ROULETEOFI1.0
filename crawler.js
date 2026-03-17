@@ -101,7 +101,7 @@ async function startScraper() {
 
     try {
         console.log("⏳ Navigating to stats page...");
-        await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 90000 });
         console.log("✅ Page loaded. Beginning extraction loop...");
 
         setInterval(async () => {
