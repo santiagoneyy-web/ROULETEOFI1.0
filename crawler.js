@@ -58,17 +58,22 @@ async function startScraper() {
 
     let browser;
     try {
+        // Use internally detected path if env not set
+        const finalExePath = exePath || puppeteer.executablePath();
+        console.log(`🎬 Launching browser from: ${finalExePath}`);
+
         browser = await puppeteer.launch({
-            headless: "new",
-            executablePath: exePath || undefined,
+            headless: true, // Simplified for modern Puppeteer
+            executablePath: finalExePath,
             args: [
                 '--no-sandbox', 
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
                 '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote',
                 '--single-process',
-                '--no-zygote'
+                '--disable-extensions'
             ]
         });
     } catch (e) {
