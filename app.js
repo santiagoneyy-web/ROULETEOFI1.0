@@ -132,16 +132,15 @@ setInterval(updateClock, 1000);
 
 function renderSignalsPanel(signals) {
     const tabStrip = document.getElementById('strat-tabs');
-    if (!tabStrip) { console.warn("No strat-tabs found"); return; }
+    const cardCont = document.getElementById('analysis-card-container');
+    if (!tabStrip || !cardCont) return;
 
     try {
         const names = ['N17', 'N16', 'N17PLUS', 'N18', 'CELULA'];
-        
         tabStrip.innerHTML = names.map((name, idx) => {
             const h = iaSignalsHistory[idx] || [];
             const wTotal = h.filter(x => x === 'win').length;
             const hitTotal = h.length > 0 ? Math.round((wTotal / h.length) * 100) : 0;
-            
             return `<button class="nav-item ${idx === activeIaTab ? 'active' : ''}" onclick="setActiveIaTab(${idx})">
                 <span>${name}</span>
                 <span class="status-pill">${hitTotal}%</span>
@@ -151,15 +150,35 @@ function renderSignalsPanel(signals) {
         if (activeAgentLabel) activeAgentLabel.innerText = names[activeIaTab];
 
         const s = signals[activeIaTab];
-        if (topSignalEl) {
-            if (!s || !s.top || s.rule === 'STOP') {
-                topSignalEl.style.display = 'none';
-            } else {
-                topSignalEl.style.display = 'inline-block';
-                topSignalEl.innerText = `TARGET: ${s.top} | CONF: ${s.confidence || '85%'} | PLAY: ${s.small}-${s.big}`;
-                if (parseInt(s.confidence) > 50) topSignalEl.classList.add('signal-pulse');
-                else topSignalEl.classList.remove('signal-pulse');
-            }
+        if (!s || !s.top || s.rule === 'STOP') {
+            cardCont.style.display = 'none';
+        } else {
+            cardCont.style.display = 'flex';
+            cardCont.innerHTML = `
+                <div class="analysis-header">
+                    <div class="analysis-title">${names[activeIaTab]} ANALYSIS</div>
+                    <div style="font-size:0.6rem; color:var(--text-dim);">CONFIDENCE: <span style="color:var(--green);">${s.confidence || '85%'}</span></div>
+                </div>
+                <div class="analysis-main">
+                    <div class="target-circle">
+                        <span class="target-num-big">${s.top}</span>
+                        <span style="font-size:0.5rem; opacity:0.5; margin-top:-5px;">TARGETED</span>
+                    </div>
+                </div>
+                <div class="analysis-footer-grid">
+                    <div class="footer-box">
+                        <div class="footer-label">SMALL</div>
+                        <div style="color:#fff; font-weight:800; font-size:0.9rem;">${s.small || '--'}</div>
+                    </div>
+                    <div class="footer-box active">
+                        <div class="footer-label">TOP</div>
+                        <div style="color:var(--gold); font-weight:900; font-size:1.1rem;">${s.top}</div>
+                    </div>
+                    <div class="footer-box">
+                        <div class="footer-label">BIG</div>
+                        <div style="color:#fff; font-weight:800; font-size:0.9rem;">${s.big || '--'}</div>
+                    </div>
+                </div>`;
         }
     } catch (e) { console.error("Pro Signal Render Error:", e); }
 }
