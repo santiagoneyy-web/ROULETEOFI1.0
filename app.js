@@ -156,18 +156,17 @@ async function submitNumber(val, silent = false, batch = false) {
         }
 
         // Evaluate previous signals against this new number
-        if (!batch) {
-            lastIaSignals.forEach((s, idx) => {
-                if (!s || s.confidence === '0%' || s.rule === 'STOP') return;
-                let win = false;
-                if (s.betZone && s.betZone.length > 0) win = s.betZone.includes(n);
-                else if (s.number !== null && s.number !== undefined) win = wheelDistance(n, s.number) <= (idx === 2 ? 4 : 9);
-                
-                if (win) iaWins[idx]++; else iaLosses[idx]++;
-                iaSignalsHistory[idx].push(win ? 'win' : 'loss');
-                if (activeIaTab === idx) { if (win) recommendedWin++; else recommendedLoss++; }
-            });
-        }
+        lastIaSignals.forEach((s, idx) => {
+            if (!s || s.confidence === '0%' || s.rule === 'STOP') return;
+            let win = false;
+            // n16 (idx 0), n17 (idx 1), 1717 (idx 2), N18 (idx 3)
+            if (s.betZone && s.betZone.length > 0) win = s.betZone.includes(n);
+            else if (s.number !== null && s.number !== undefined) win = wheelDistance(n, s.number) <= (idx === 2 ? 4 : 8);
+            
+            if (win) iaWins[idx]++; else iaLosses[idx]++;
+            iaSignalsHistory[idx].push(win ? 'win' : 'loss');
+            if (activeIaTab === idx) { if (win) recommendedWin++; else recommendedLoss++; }
+        });
     }
 
     // 2. UI RENDERING (Triggered if not in batch mode, even if no number was provided)
