@@ -25,6 +25,10 @@ const tableSelect      = document.getElementById('table-select');
 const sidebarNav = document.getElementById('strat-tabs');
 const activeAgentLabel = document.getElementById('active-agent-name');
 
+const wheelCanvas = document.getElementById('wheel-canvas');
+const wheelCtx = wheelCanvas ? wheelCanvas.getContext('2d') : null;
+
+const WHEEL_NUMS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
 const RED_NUMS = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 function numColor(n) { if (n === 0) return 'green'; if (RED_NUMS.has(n)) return 'red'; return 'black'; }
 
@@ -36,7 +40,51 @@ function wheelDistance(a, b) {
     return dist > 18 ? 37 - dist : dist;
 }
 
-function drawWheel(highlightNum = null) { /* Removed for professional alignment */ }
+function drawWheel(highlightNum = null) {
+    if (!wheelCtx) return;
+    const ctx = wheelCtx;
+    const cx = 110, cy = 110, r = 90;
+    ctx.clearRect(0,0,220,220);
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 15, 0, Math.PI * 2);
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 10;
+    ctx.stroke();
+
+    WHEEL_NUMS.forEach((n, i) => {
+        const ang = (i * (360 / 37) - 90) * (Math.PI / 180);
+        const x = cx + Math.cos(ang) * r;
+        const y = cy + Math.sin(ang) * r;
+
+        // Pocket color
+        ctx.beginPath();
+        ctx.arc(x, y, 7, 0, Math.PI * 2);
+        ctx.fillStyle = (n === 0) ? '#00ff00' : (RED_NUMS.has(n) ? '#ff3b5c' : '#111');
+        ctx.fill();
+        
+        // Highlight hit
+        if (n === highlightNum) {
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.strokeStyle = '#f5c842';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Ball
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+        }
+
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.font = '7px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(n, x, y + 3);
+    });
+}
 
 function renderHistory() {
     if (!historyEl) return;
@@ -143,7 +191,6 @@ function renderTravelPanel(sig) {
         const colorClass = RED_NUMS.has(n) ? 'val-down' : (n === 0 ? 'val-up' : 'val-neutral');
         const d = (sig.travelHistory && sig.travelHistory[history.length - 1 - i]) || 0;
         const rpm = (21.0 + Math.random()).toFixed(1);
-        const angle = Math.floor(Math.random() * 360);
         
         // Define Small/Big for Travel Data
         const isSmall = n > 0 && n <= 18;
@@ -157,7 +204,6 @@ function renderTravelPanel(sig) {
             <td>${d > 0 ? 'DER' : (d < 0 ? 'IZQ' : '---')}</td>
             <td>${rpm} RPM</td>
             <td><span class="badge ${phaseClass}" style="font-size:0.6rem; padding:2px 8px;">${phaseLabel}</span></td>
-            <td>${angle}°</td>
         </tr>`;
     }).join('');
 
@@ -214,6 +260,7 @@ async function submitNumber(val, silent = false, batch = false) {
     if (!batch) {
         renderHistory(); 
         renderTravelPanel(sig); 
+        drawWheel(history[history.length - 1]);
         renderSignalsPanel(finalSigs);
         
         if (!silent) {

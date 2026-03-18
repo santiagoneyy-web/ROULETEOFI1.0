@@ -65,7 +65,6 @@
                                 <th>DIR</th>
                                 <th>SPEED</th>
                                 <th>PHASE</th>
-                                <th>ANGLE</th>
                             </tr>
                         </thead>
                         <tbody id="travel-tbody"></tbody>
@@ -77,6 +76,9 @@
 
     <!-- ════════ INPUT SIDEBAR (Right) ════════ -->
     <aside class="input-panel">
+        <div class="wheel-section" style="padding:20px; text-align:center; border-bottom:1px solid var(--border);">
+            <canvas id="wheel-canvas" width="220" height="220"></canvas>
+        </div>
         <div class="manual-input" style="padding:20px;">
             <div style="font-size:0.6rem; text-transform:uppercase; color:var(--text-dim); margin-bottom:8px;">Manual Entry</div>
             <div style="display:flex; gap:5px;">
