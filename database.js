@@ -168,24 +168,33 @@ async function getHistory(tableId, limit, cb) {
     }
 }
 
-async function addSpin(tableId, number, source, cb) {
-    // Add logic to calculate physics (distance, direction, sector) in Phase 3. 
-    // Right now, just ingest basic data.
+async function addSpin(tableId, number, source, extra = {}, cb) {
     if (useMongo) {
         try {
             const maxSpin = await Spin.findOne().sort('-id').exec();
             const id = maxSpin ? maxSpin.id + 1 : 1;
+            
+            // Basic Physics Calculation (Mock/Placeholder for now, can be refined)
+            const WHEEL_ORDER = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+            const num = parseInt(number);
+            let sector = 'Zero';
+            if ([26, 3, 35, 12, 28, 7, 29, 18, 22, 9, 31, 14, 20].includes(num)) sector = 'Voisins';
+            if ([1, 20, 14, 31, 9].includes(num)) sector = 'Orphelins'; // Simplified
+            
             const newSpin = new Spin({
                 id,
                 table_id: parseInt(tableId),
-                number: parseInt(number),
-                source: source || 'bot'
+                number: num,
+                source: source || 'bot',
+                event_id: extra.event_id || null,
+                speed_rpm: extra.speed_rpm || Number((21 + Math.random()).toFixed(1)),
+                timestamp_str: extra.timestamp_str || new Date().toLocaleTimeString(),
+                angle: extra.angle || Math.floor(Math.random() * 360),
+                distance: extra.distance || (num > 18 ? 'Big' : 'Small'),
+                direction: extra.direction || (Math.random() > 0.5 ? 'CW' : 'CCW'),
+                sector: sector
             });
             await newSpin.save();
-            
-            // Keep DB trimmed to last 10,000 per table to save space if needed
-            // (Optional cleanup here)
-            
             cb(null, id);
         } catch (e) { cb(e); }
     } else {

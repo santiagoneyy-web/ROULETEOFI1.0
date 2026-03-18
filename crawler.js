@@ -136,16 +136,20 @@ async function poll() {
             const evId = ev.data?.id || ev.id;
             const num = ev.data?.result?.outcome?.number;
             
+            // Critical: Extra check to prevent duplicate posts during rapid poll cycles
+            if (evId === lastKnownEventId) continue;
+
             if (num !== undefined && num !== null) {
                 console.log(`✨ NEW SPIN [T${TABLE_ID}] EventId: ${evId} → Number: ${num}`);
                 try {
                     await axios.post(API_URL, {
                         table_id: parseInt(TABLE_ID),
                         number: parseInt(num),
-                        source: 'casino_api'
+                        source: 'casino_api',
+                        event_id: evId // Pass ID for server-side guard too
                     }, { timeout: 10000 });
                     console.log(`✅ [T${TABLE_ID}] Posted: ${num}`);
-                    lastKnownEventId = evId; // Update only after successful post
+                    lastKnownEventId = evId; 
                 } catch (postErr) {
                     console.error(`❌ [T${TABLE_ID}] API Post Error: ${postErr.message}`);
                     break; // Stop and retry next poll if server is down

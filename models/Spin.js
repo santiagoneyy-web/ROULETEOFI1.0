@@ -7,10 +7,16 @@ const SpinSchema = new mongoose.Schema({
     source: { type: String, default: 'bot' },
     
     // Physical characteristics (calculated on ingest)
-    distance: { type: String, enum: ['Small', 'Big', 'Zero', null], default: null }, // 1-9 vs 10-18
-    direction: { type: String, enum: ['CW', 'CCW', null], default: null },
-    sector: { type: String, enum: ['Voisins', 'Orphelins', 'Tiers', 'Zero', null], default: null },
+    distance: { type: String, default: null }, 
+    direction: { type: String, default: null },
+    sector: { type: String, default: null },
     
+    // Pro v3.1 Metrics
+    event_id: { type: String, default: null },
+    speed_rpm: { type: Number, default: null },
+    timestamp_str: { type: String, default: null },
+    angle: { type: Number, default: null },
+
     // Predictions from Agents (snapshots)
     predictions: {
         agent1_top: { type: Number, default: null },
