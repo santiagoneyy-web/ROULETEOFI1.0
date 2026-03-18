@@ -110,20 +110,14 @@ async function predictAgent5(tableId, currentHistoryNumbers, otherAgentsDNA = []
             }
         }
         
-        // --- 3. AUTONOMOUS SYNTHESIS (Choosing the Perfect Path) ---
-        // If memory is empty, fallback to 2-seq then 1-seq
+        // --- 4. AUTONOMOUS SYNTHESIS (Synthesis of All Intelligence) ---
+        // Fallback: If memory is empty, use global table frequencies as a base
         if (totalMatches === 0) {
-            for (let i = 0; i < nums.length - 1; i++) {
-                if (nums[i] === seq[2]) {
-                    const n = nums[i+1];
-                    memoryMatches[n] = (memoryMatches[n] || 0) + 1;
-                    totalMatches++;
-                }
-            }
+            nums.forEach(n => memoryMatches[n] = (memoryMatches[n] || 0) + 0.1);
         }
 
         // FUSE Intelligence Layers
-        // Célula takes his memory score and FUSES it with the Tactical DNA
+        // Célula takes his memory score and FUSES it with the Tactical DNA of his team
         Object.keys(combinedIntelligence).forEach(n => {
             if (memoryMatches[n]) {
                 memoryMatches[n] += combinedIntelligence[n] * 1.5; // SYNERGY BOOST
@@ -132,28 +126,20 @@ async function predictAgent5(tableId, currentHistoryNumbers, otherAgentsDNA = []
             }
         });
 
-        // Final Selection
-        let topNum = null;
-        let maxScore = 0;
-        const allCandidates = memoryMatches;
-        
-        for (const [numStr, score] of Object.entries(allCandidates)) {
-            if (score > maxScore) {
-                maxScore = score;
-                topNum = parseInt(numStr);
-            }
+        // Final Choice
+        let topNum = null, maxScore = 0;
+        for (const [numStr, score] of Object.entries(memoryMatches)) {
+            const s = parseFloat(score);
+            if (s > maxScore) { maxScore = s; topNum = parseInt(numStr); }
         }
 
         // PERFECT DNA Check
         let dnaMatchFound = false;
-        if (topNum !== null) {
-            const teamAgree = otherAgentsDNA.some(a => a.number === topNum || a.tp === topNum);
-            if (teamAgree && maxScore > 10) {
-                console.log(`🧬 [Célula] ABSOLUTE PERFECTION: Intelligence fused. Top: ${topNum}`);
+        if (topNum !== null && otherAgentsDNA.some(a => a.number === topNum || a.tp === topNum)) {
+            if (maxScore > 10) {
+                console.log(`🧬 [Célula] ABSOLUTE PERFECTION: Intelligence fused for number ${topNum}`);
                 dnaMatchFound = true;
             }
-        }
-ue;
         }
 
         return { topNum, dnaMatch: dnaMatchFound };
