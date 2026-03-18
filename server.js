@@ -138,14 +138,15 @@ app.post('/api/spin', async (req, res) => {
         if (ag4) newPredictions.agent4_top = ag4.number;
     }
 
-    // Agent 5 (Historical Similarity) - DNA Absorption enabled
-    const ag5Top = await agent5.predictAgent5(table_id, numsOnly, masterSignals);
-            if (ag5Top !== null) {
-                newPredictions.agent5_top = ag5Top;
-                console.log(`🤖 [Agent 5] Generated prediction based on ${numsOnly.length} spins.`);
-            } else if (numsOnly.length < 50) {
-                console.log(`⏳ [Agent 5] Learning mode: (${numsOnly.length}/50) spins collected.`);
-            }
+    // Célula (Androide Célula) - DNA Absorption enabled
+    const ag5Result = await agent5.predictAgent5(table_id, numsOnly, masterSignals);
+    if (ag5Result) {
+        newPredictions.agent5_top = ag5Result.topNum;
+        newPredictions.agent5_dna = ag5Result.dnaMatch; 
+        console.log(`🤖 [Célula] Generated prediction: ${ag5Result.topNum} ${ag5Result.dnaMatch ? '(PERFECT DNA)' : ''}`);
+    } else if (numsOnly.length < 50) {
+        console.log(`⏳ [Célula] Learning mode: (${numsOnly.length}/50) spins.`);
+    }
         }
 
         // ── NODO 4: SINCRONIZACIÓN (Guardar la inyección enriquecida) ──

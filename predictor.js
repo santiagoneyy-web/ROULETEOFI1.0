@@ -175,13 +175,25 @@ function getBestMathematicalStrategy(prox) {
     return { ...prox[0], momentum: 1 };
 }
 
+console.log("🚀 [Predictor] Core logic loaded.");
+
+// Helper for browser/node hybrid
+const _export = (typeof module !== 'undefined' && module.exports) ? module.exports : (window || {});
+
+if (typeof window !== 'undefined') {
+    window.analyzeSpin = analyzeSpin;
+    window.projectNextRound = projectNextRound;
+    window.computeDealerSignature = computeDealerSignature;
+    window.getIAMasterSignals = getIAMasterSignals;
+    window.getBestMathematicalStrategy = getBestMathematicalStrategy;
+    window.WHEEL_ORDER = WHEEL_ORDER;
+    window.WHEEL_INDEX = WHEEL_INDEX;
+    window.STRATEGIES = STRATEGIES;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        STRATEGIES,
-        analyzeSpin,
-        projectNextRound,
-        computeDealerSignature,
-        getIAMasterSignals,
-        getBestMathematicalStrategy
+        STRATEGIES, WHEEL_ORDER, WHEEL_INDEX,
+        analyzeSpin, projectNextRound, computeDealerSignature, getIAMasterSignals, getBestMathematicalStrategy
     };
 }

@@ -13,6 +13,7 @@ let recommendedLoss = 0;
 let lastIaSignals = [null, null, null, null, null]; 
 let activeIaTab    = 0; 
 let latestAgent5Top = null; 
+let latestAgent5Dna = false; 
 let activeTab      = '-'; 
 
 const API_BASE = '/api';
@@ -115,11 +116,22 @@ function renderSignalsPanel(signals) {
         const s = signals[activeIaTab];
         let content = '<p class="muted">Sin señal.</p>';
         if (s) {
-            content = `<div class="ia-active-slot">
-                <div class="ia-slot-header"><span>${s.name}</span><span>${s.confidence || '0%'}</span></div>
-                <div class="ia-main-num">${s.number !== null ? s.number : (s.tp || '...')}</div>
-                <div class="ia-slot-footer">W:${iaWins[activeIaTab]} L:${iaLosses[activeIaTab]}</div>
-            </div>`;
+            const isCélula = s.name === 'Célula';
+            const isPerfect = s.confidence === 'PERFECTION';
+            
+            if (isCélula) {
+                content = `<div class="ia-active-slot ${isPerfect ? 'slot-perfect' : ''}" style="${isPerfect ? 'border-color: #f5c842; box-shadow: 0 0 15px rgba(245, 200, 66, 0.4);' : ''}">
+                    <div class="ia-slot-header"><span style="color:${isPerfect ? '#f5c842' : '#fff'}">🧬 ${s.name}</span><span style="color:${isPerfect ? '#f5c842' : 'inherit'}">${s.confidence || '0%'}</span></div>
+                    <div class="ia-main-num" style="color:${isPerfect ? '#f5c842' : '#fff'}">${s.number !== null ? s.number : '...'}</div>
+                    <div class="ia-slot-footer"><div>${s.rule || '...' }</div><div class="ia-reason">${s.reason || ''}</div></div>
+                </div>`;
+            } else {
+                content = `<div class="ia-active-slot">
+                    <div class="ia-slot-header"><span>${s.name}</span><span>${s.confidence || '0%'}</span></div>
+                    <div class="ia-main-num">${s.number !== null ? s.number : (s.tp || '...')}</div>
+                    <div class="ia-slot-footer">W:${iaWins[activeIaTab]} L:${iaLosses[activeIaTab]}</div>
+                </div>`;
+            }
         }
         const dots = (iaSignalsHistory[activeIaTab] || []).slice(-10).map(h => `<span class="m-hist-badge ${h === 'win' ? 'm-hist-w' : 'm-hist-l'}">${h === 'win' ? 'W' : 'L'}</span>`).join('');
         topPanel.innerHTML = `<div class="ia-tabs-strip">${tabButtons}</div>${content}<div class="ia-pattern-strip">${dots}</div>`;
@@ -128,51 +140,71 @@ function renderSignalsPanel(signals) {
 
 async function submitNumber(val, silent = false, batch = false) {
     let n = parseInt(val || numInput.value);
-    if (isNaN(n) || n < 0 || n > 36) return;
     
-    // Always push to history, even if silent (history reload)
-    history.push(n);
+    // 1. DATA PROCESSING (Only if a valid number is provided)
+    if (!isNaN(n) && n >= 0 && n <= 36) {
+        history.push(n);
 
-    if (!silent) {
-        try { 
-            const resp = await apiPostSpin(currentTableId, n); 
-            if (resp && resp.predictions && resp.predictions.agent5_top !== undefined) {
-                latestAgent5Top = resp.predictions.agent5_top;
-            }
-        } catch(e) { console.error("Error posting spin:", e); }
+        if (!silent) {
+            try { 
+                const resp = await apiPostSpin(currentTableId, n); 
+                if (resp && resp.predictions) {
+                    if (resp.predictions.agent5_top !== undefined) latestAgent5Top = resp.predictions.agent5_top;
+                    if (resp.predictions.agent5_dna !== undefined) latestAgent5Dna = resp.predictions.agent5_dna;
+                }
+            } catch(e) { console.error("Error posting spin:", e); }
+        }
+
+        // Evaluate previous signals against this new number
+        if (!batch) {
+            lastIaSignals.forEach((s, idx) => {
+                if (!s || s.confidence === '0%' || s.rule === 'STOP') return;
+                let win = false;
+                if (s.betZone && s.betZone.length > 0) win = s.betZone.includes(n);
+                else if (s.number !== null && s.number !== undefined) win = wheelDistance(n, s.number) <= (idx === 2 ? 4 : 9);
+                
+                if (win) iaWins[idx]++; else iaLosses[idx]++;
+                iaSignalsHistory[idx].push(win ? 'win' : 'loss');
+                if (activeIaTab === idx) { if (win) recommendedWin++; else recommendedLoss++; }
+            });
+        }
     }
 
-    // 1. Evaluar señales anteriores (Solo si no es carga inicial masiva o si es el último del batch)
+    // 2. UI RENDERING (Triggered if not in batch mode, even if no number was provided)
     if (!batch) {
-        lastIaSignals.forEach((s, idx) => {
-            if (!s || s.confidence === '0%' || s.rule === 'STOP') return;
-            let win = false;
-            if (s.betZone && s.betZone.length > 0) win = s.betZone.includes(n);
-            else if (s.number !== null && s.number !== undefined) win = wheelDistance(n, s.number) <= (idx === 2 ? 4 : 9);
-            
-            if (win) iaWins[idx]++; else iaLosses[idx]++;
-            iaSignalsHistory[idx].push(win ? 'win' : 'loss');
-            if (activeIaTab === idx) { if (win) recommendedWin++; else recommendedLoss++; }
+        if (typeof computeDealerSignature === 'undefined' || typeof analyzeSpin === 'undefined') {
+            console.error("❌ Critical: predictor.js logic not loaded.");
+            return;
+        }
+
+        const sig = computeDealerSignature(history);
+        const res = analyzeSpin(history, stats);
+        const prx = projectNextRound(history, stats);
+        const sigs = getIAMasterSignals(prx, sig, history) || [];
+        
+        // Agent 5 (Célula)
+        sigs.push({ 
+            name: 'Célula', 
+            number: latestAgent5Top,
+            confidence: latestAgent5Top !== null ? (latestAgent5Dna ? 'PERFECTION' : 'MAX') : '0%',
+            rule: latestAgent5Dna ? 'PERFECT DNA' : (latestAgent5Top !== null ? 'BDD' : 'APRENDIENDO'),
+            reason: latestAgent5Top !== null ? (latestAgent5Dna ? 'SINCRONIA TOTAL' : 'HISTÓRICO') : (history.length < 50 ? `GRABANDO ${history.length}/50` : 'ANALIZANDO...')
         });
-    }
-
-    const sig = computeDealerSignature(history);
-    const res = analyzeSpin(history, stats);
-    const prx = projectNextRound(history, stats);
-    const sigs = getIAMasterSignals(prx, sig, history) || [];
-    
-    // Agent 5 (Célula)
-    sigs.push({ 
-        name: 'Célula', 
-        number: latestAgent5Top,
-        confidence: latestAgent5Top !== null ? 'MAX' : '0%',
-        reason: latestAgent5Top !== null ? 'HISTÓRICO' : (history.length < 50 ? `GRABANDO ${history.length}/50` : 'ANALIZANDO...')
-    });
-    
-    lastIaSignals = sigs;
-    if (!batch) {
-        renderHistory(); drawWheel(n); buildStratTabs(res); renderTargetPanel(res); renderNextPanel(prx); renderTravelPanel(sig); renderSignalsPanel(sigs);
-        numInput.value = ''; numInput.focus();
+        
+        lastIaSignals = sigs;
+        
+        renderHistory(); 
+        drawWheel(isNaN(n) ? null : n); 
+        buildStratTabs(res); 
+        renderTargetPanel(res); 
+        renderNextPanel(prx); 
+        renderTravelPanel(sig); 
+        renderSignalsPanel(sigs);
+        
+        if (!silent) {
+            numInput.value = ''; 
+            numInput.focus();
+        }
     }
 }
 

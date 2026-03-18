@@ -69,20 +69,43 @@ async function predictAgent5(tableId, currentHistoryNumbers, otherAgentsDNA = []
             });
         }
         const nums = history.map(h => h.number);
+        const physicsData = history.map(h => ({ dist: h.distance, dir: h.direction }));
         
+        // Current Physics sequence
+        const currentPhys = [];
+        for (let i = currentHistoryNumbers.length - 3; i < currentHistoryNumbers.length - 1; i++) {
+            currentPhys.push(getPhysics(currentHistoryNumbers[i], currentHistoryNumbers[i+1]));
+        }
+
         let nextNumberFrequencies = {};
         let matches = 0;
         
+        // --- 1. DEEP PATTERN MATCHING (Numbers + Physics) ---
         for (let i = 0; i < nums.length - 3; i++) {
-            if (nums[i] === seq[0] && nums[i+1] === seq[1] && nums[i+2] === seq[2]) {
+            // Check Number Sequence (3 spins)
+            const numMatch = (nums[i] === seq[0] && nums[i+1] === seq[1] && nums[i+2] === seq[2]);
+            
+            // Check Physics Sequence (Last 2 transitions)
+            const p1 = getPhysics(nums[i], nums[i+1]);
+            const p2 = getPhysics(nums[i+1], nums[i+2]);
+            const physMatch = (p1.distance === currentPhys[0].distance && p1.direction === currentPhys[0].direction &&
+                               p2.distance === currentPhys[1].distance && p2.direction === currentPhys[1].direction);
+
+            if (numMatch || physMatch) {
                 const nextNum = nums[i+3];
                 if (!nextNumberFrequencies[nextNum]) nextNumberFrequencies[nextNum] = 0;
-                nextNumberFrequencies[nextNum]++;
+                
+                // Weight: Number match is strong, Physics match is subtle, Both is "Perfect"
+                let weight = 0;
+                if (numMatch) weight += 2;
+                if (physMatch) weight += 1;
+                
+                nextNumberFrequencies[nextNum] += weight;
                 matches++;
             }
         }
         
-        // If exact sequence not found, fallback to 2 numbers
+        // --- 2. FALLBACK 1 (2-Number Sequence) ---
         if (matches === 0) {
             for (let i = 0; i < nums.length - 2; i++) {
                 if (nums[i] === seq[1] && nums[i+1] === seq[2]) {
@@ -94,7 +117,7 @@ async function predictAgent5(tableId, currentHistoryNumbers, otherAgentsDNA = []
             }
         }
         
-        // If still no matches, fallback to 1 number (last number)
+        // --- 3. FALLBACK 2 (Last Number Only) ---
         if (matches === 0) {
             for (let i = 0; i < nums.length - 1; i++) {
                 if (nums[i] === seq[2]) {
@@ -106,13 +129,24 @@ async function predictAgent5(tableId, currentHistoryNumbers, otherAgentsDNA = []
             }
         }
 
-        // If still no matches, we can't predict
+        // If still no matches, foolproof fallback: Global Frequencies for this table
         if (matches === 0) {
-            console.log(`❌ [Agent 5] No pattern matches found in ${nums.length} records.`);
+            console.log(`⚠️ [Célula] No sequence matches. Falling back to global table frequencies.`);
+            for (let i = 0; i < nums.length; i++) {
+                const n = nums[i];
+                if (!nextNumberFrequencies[n]) nextNumberFrequencies[n] = 0;
+                nextNumberFrequencies[n]++;
+                matches++;
+            }
+        }
+
+        // If even global fails (empty table?), return null
+        if (matches === 0) {
+            console.log(`❌ [Célula] Critical: No history found for table ${tableId}.`);
             return null;
         }
         
-        // Find the most frequent next number
+        // Find the most frequent next number (The "Perfect Selection")
         let topNum = null;
         let maxFreq = 0;
         for (const [numStr, freq] of Object.entries(nextNumberFrequencies)) {
@@ -123,14 +157,16 @@ async function predictAgent5(tableId, currentHistoryNumbers, otherAgentsDNA = []
         }
         
         // DNA ABSORPTION: Check if our top Num aligns with other elite agents
+        let dnaMatchFound = false;
         if (topNum !== null && otherAgentsDNA.length > 0) {
-            const dnaMatch = otherAgentsDNA.find(a => a.number === topNum || a.tp === topNum);
-            if (dnaMatch) {
-                console.log(`🧬 [Célula] DNA Match detected! Prediction ${topNum} aligns with ${dnaMatch.name}. Perfection achieved.`);
+            const match = otherAgentsDNA.find(a => a.number === topNum || a.tp === topNum);
+            if (match) {
+                console.log(`🧬 [Célula] DNA Match detected! Prediction ${topNum} aligns with ${match.name}. Perfection achieved.`);
+                dnaMatchFound = true;
             }
         }
 
-        return topNum;
+        return { topNum, dnaMatch: dnaMatchFound };
         
     } catch (e) {
         console.error("Agent 5 execution error:", e);
