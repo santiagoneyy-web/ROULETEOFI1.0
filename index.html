@@ -22,6 +22,16 @@
         </div>
     </header>
 
+    <!-- ═══ VISUAL PANEL (Wheel + Mini History) ═══ -->
+    <section class="visual-panel-mini">
+        <div class="wheel-container">
+            <canvas id="wheel-canvas" width="100" height="100"></canvas>
+        </div>
+        <div id="history-strip-mini" class="history-strip-mini">
+            <!-- Last 15 numbers (ball style) -->
+        </div>
+    </section>
+
     <!-- ═══ AGENT TABS ═══ -->
     <nav class="agent-tab-bar" id="strat-tabs"></nav>
 
@@ -69,8 +79,10 @@
             <span class="status-msg" id="agent-status-msg">SOPORTE BIG N9</span>
         </div>
 
-        <!-- Result dots -->
-        <div class="result-dots" id="result-dots"></div>
+        <!-- Long-form performance string (WWLL...) -->
+        <div class="performance-string" id="agent-performance">
+            <!-- Filled by JS -->
+        </div>
     </section>
 
     <!-- ═══ TRAVEL DATA ═══ -->

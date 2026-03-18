@@ -56,6 +56,8 @@ function renderAgentCard(signals) {
     const nameEl    = document.getElementById('active-agent-name');
     const confEl    = document.getElementById('agent-confidence');
     const statusMsg = document.getElementById('agent-status-msg');
+    const statusEl  = document.getElementById('agent-status');
+    const syncEl    = document.getElementById('agent-sync');
     const targetEl  = document.getElementById('target-number');
     const radiusEl  = document.getElementById('pi-radius');
     const tendEl    = document.getElementById('pi-tendency');
@@ -68,7 +70,13 @@ function renderAgentCard(signals) {
     if (nameEl)   nameEl.innerText   = (AGENT_NAMES[activeIaTab] || 'AGENT').toUpperCase();
     if (confEl)   confEl.innerText   = (s.confidence || '90%') + ' CONF.';
     if (statusMsg) statusMsg.innerText = (s.rule || AGENT_MODES[activeIaTab]) + ' ' + (s.radius || 'N9');
-    if (targetEl) targetEl.innerText = s.top !== undefined ? s.top : '--';
+    if (statusEl) statusEl.innerText = s.reason || 'ANALIZANDO PATRONES...';
+    if (syncEl)   syncEl.innerText   = s.mode ? `MODO: ${s.mode}` : 'SINCRONIZADO';
+    
+    // Support either 'top' or 'number' from predictor.js
+    const targetNum = s.top !== undefined ? s.top : (s.number !== undefined ? s.number : '--');
+    if (targetEl) targetEl.innerText = targetNum;
+    
     if (radiusEl) radiusEl.innerText = s.radius ? s.radius.toLowerCase() : 'n9';
     
     // Tendency from last dist
@@ -88,12 +96,87 @@ function renderAgentCard(signals) {
     if (winsEl)   winsEl.innerText   = wins;
     if (lossesEl) lossesEl.innerText = losses;
 
-    // Result dots (last 5)
-    if (dotsEl) {
-        const last5 = h.slice(-5);
-        dotsEl.innerHTML = last5.map(r =>
-            `<span class="rd ${r === 'win' ? 'rd-win' : 'rd-loss'}">${r === 'win' ? 'W' : 'L'}</span>`
+    // Performance string (All WWLL...)
+    const perfEl = document.getElementById('agent-performance');
+    if (perfEl) {
+        perfEl.innerHTML = h.slice(-15).map(r => 
+            `<span class="${r === 'win' ? 'perf-w' : 'perf-l'}">${r === 'win' ? 'W' : 'L'}</span>`
         ).join('');
+    }
+}
+
+// ─── RENDER: WHEEL ──────────────────────────────────────────
+function drawWheel(highlightNum = null) {
+    const canvas = document.getElementById('wheel-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const cx = 50, cy = 50;
+    ctx.clearRect(0, 0, 100, 100);
+
+    const goldColor = '#f5c842';
+
+    ctx.beginPath(); ctx.arc(cx, cy, 48, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a1a1a'; ctx.fill();
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
+
+    WHEEL_NUMS.forEach((n, i) => {
+        const startAng = (i * (360 / 37) - 90 - (360/74)) * (Math.PI / 180);
+        const endAng   = (i * (360 / 37) - 90 + (360/74)) * (Math.PI / 180);
+        const midAng   = (i * (360 / 37) - 90) * (Math.PI / 180);
+
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(startAng) * 25, cy + Math.sin(startAng) * 25);
+        ctx.arc(cx, cy, 45, startAng, endAng);
+        ctx.lineTo(cx + Math.cos(endAng) * 25, cy + Math.sin(endAng) * 25);
+        ctx.closePath();
+        
+        ctx.fillStyle = (n === 0) ? '#008b00' : (RED_NUMS.has(n) ? '#c41e3a' : '#000');
+        ctx.fill();
+        ctx.strokeStyle = '#222'; ctx.lineWidth = 0.5; ctx.stroke();
+
+        const rx = cx + Math.cos(midAng) * 36;
+        const ry = cy + Math.sin(midAng) * 36;
+        
+        ctx.save();
+        ctx.translate(rx, ry); ctx.rotate(midAng + Math.PI/2);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 5px Inter';
+        ctx.textAlign = 'center'; ctx.fillText(n, 0, 2);
+        ctx.restore();
+
+        if (n === highlightNum) {
+            ctx.beginPath(); ctx.arc(rx, ry, 6, 0, Math.PI * 2);
+            ctx.strokeStyle = goldColor; ctx.lineWidth = 1.5; ctx.stroke();
+            const bx = cx + Math.cos(midAng) * 48;
+            const by = cy + Math.sin(midAng) * 48;
+            ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI*2);
+            ctx.fillStyle = '#fff'; ctx.shadowBlur = 4; ctx.shadowColor = '#fff';
+            ctx.fill(); ctx.shadowBlur = 0;
+        }
+    });
+
+    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, 25);
+    gr.addColorStop(0, '#333'); gr.addColorStop(1, '#000');
+    ctx.beginPath(); ctx.arc(cx, cy, 25, 0, Math.PI*2);
+    ctx.fillStyle = gr; ctx.fill();
+}
+
+// ─── RENDER: WHEEL & HISTORY ───────────────────────────────
+function renderWheelAndHistory() {
+    const strip = document.getElementById('history-strip-mini');
+    if (!strip) return;
+
+    // History (Last 15 inside the visual panel)
+    const last15 = history.slice(-15).reverse();
+    strip.innerHTML = last15.map(n => {
+        const cls = (n === 0) ? 'ball-zero' : (RED_NUMS.has(n) ? 'ball-red' : 'ball-black');
+        return `<div class="mini-ball ${cls}">${n}</div>`;
+    }).join('');
+
+    // Update Wheel
+    if (history.length > 0) {
+        drawWheel(history[history.length - 1]);
+    } else {
+        drawWheel();
     }
 }
 
@@ -101,6 +184,7 @@ function renderAgentCard(signals) {
 function renderSignalsPanel(signals) {
     renderTabs();
     renderAgentCard(signals);
+    renderWheelAndHistory();
 }
 
 // ─── RENDER: TRAVEL TABLE ──────────────────────────────────
