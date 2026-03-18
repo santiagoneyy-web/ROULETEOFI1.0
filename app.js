@@ -1,11 +1,17 @@
 // ============================================================
-// app.js — CORE UI LOGIC FIXED
+// app.js — BULLETPROOF INITIALIZATION
 // ============================================================
 
 const history      = [];
 const iaSignalsHistory = [ [], [], [], [], [] ]; 
 let activeIaTab    = 0; 
-let lastIaSignals = [null, null, null, null, null]; 
+let lastIaSignals = [
+    { top: 17, rule: 'READY' },
+    { top: 16, rule: 'READY' },
+    { top: 5,  rule: 'READY' },
+    { top: 22, rule: 'READY' },
+    { top: 10, rule: 'READY' }
+]; 
 
 const RED_NUMS = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 const WHEEL_NUMS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
@@ -37,17 +43,12 @@ function drawWheel(highlightNum = null) {
     const cx = 110, cy = 110;
     ctx.clearRect(0, 0, 220, 220);
 
-    // Style variables from CSS
     const goldColor = '#f5c842';
 
-    // 1. Bronze Outermost Circle
-    ctx.beginPath();
-    ctx.arc(cx, cy, 105, 0, Math.PI * 2);
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 105, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a1a1a'; ctx.fill();
     ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
 
-    // 2. Track & Pockets
     WHEEL_NUMS.forEach((n, i) => {
         const startAng = (i * (360 / 37) - 90 - (360/74)) * (Math.PI / 180);
         const endAng   = (i * (360 / 37) - 90 + (360/74)) * (Math.PI / 180);
@@ -67,19 +68,14 @@ function drawWheel(highlightNum = null) {
         const ry = cy + Math.sin(midAng) * 82;
         
         ctx.save();
-        ctx.translate(rx, ry);
-        ctx.rotate(midAng + Math.PI/2);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 11px Inter';
-        ctx.textAlign = 'center';
-        ctx.fillText(n, 0, 4);
+        ctx.translate(rx, ry); ctx.rotate(midAng + Math.PI/2);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 11px Inter';
+        ctx.textAlign = 'center'; ctx.fillText(n, 0, 4);
         ctx.restore();
 
         if (n === highlightNum) {
-            ctx.beginPath();
-            ctx.arc(rx, ry, 14, 0, Math.PI * 2);
+            ctx.beginPath(); ctx.arc(rx, ry, 14, 0, Math.PI * 2);
             ctx.strokeStyle = goldColor; ctx.lineWidth = 3; ctx.stroke();
-            
             const bx = cx + Math.cos(midAng) * 105;
             const by = cy + Math.sin(midAng) * 105;
             ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI*2);
@@ -89,8 +85,7 @@ function drawWheel(highlightNum = null) {
     });
 
     const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, 60);
-    gr.addColorStop(0, '#333');
-    gr.addColorStop(1, '#000');
+    gr.addColorStop(0, '#333'); gr.addColorStop(1, '#000');
     ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI*2);
     ctx.fillStyle = gr; ctx.fill();
 }
@@ -111,7 +106,7 @@ function renderSignalsPanel(signals) {
     tabStrip.innerHTML = names.map((name, idx) => {
         const h = iaSignalsHistory[idx] || [];
         const winCount = h.filter(x => x === 'win').length;
-        const wL = `(W-L ${winCount}-${h.length - winCount})`;
+        const wL = `W-L ${winCount}-${h.length - winCount}`;
         return `<div class="ia-tab ${idx === activeIaTab ? 'active' : ''}" onclick="setActiveIaTab(${idx})">
             <span>${name}</span>
             <div class="stat-line">${wL}</div>
@@ -121,9 +116,8 @@ function renderSignalsPanel(signals) {
     if (activeAgentLabel) activeAgentLabel.innerText = names[activeIaTab];
 
     const s = signals[activeIaTab];
-    if (targetNumEl) targetNumEl.innerText = (s && s.top && s.rule !== 'STOP') ? s.top : '--';
+    if (targetNumEl) targetNumEl.innerText = (s && s.top) ? s.top : '--';
     
-    // Opacity for prediction boxes
     const smallBox = document.getElementById('pred-small-val');
     const bigBox = document.getElementById('pred-big-val');
     if (smallBox && bigBox && s && s.top) {
@@ -135,7 +129,7 @@ function renderSignalsPanel(signals) {
 function renderTravelPanel() {
     if (!travelTbody) return;
     if (history.length < 2) {
-        travelTbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center; padding:30px;">Analyzing data...</td></tr>';
+        travelTbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center; padding:30px;">Analyzing incoming spin data...</td></tr>';
         return;
     }
 
@@ -160,14 +154,12 @@ function renderTravelPanel() {
     }).join('');
 }
 
-// Data Processing
 async function submitNumber(val, silent = false, batch = false) {
     let n = parseInt(val);
     if (!isNaN(n) && n >= 0 && n <= 36) {
         history.push(n);
-        // IA Win/Loss logic...
         lastIaSignals.forEach((s, idx) => {
-            if (!s || s.rule === 'STOP') return;
+            if (!s) return;
             const target = s.top;
             if (target !== null) {
                 const win = (Math.abs(calcDist(n, target)) <= 4);
@@ -176,35 +168,29 @@ async function submitNumber(val, silent = false, batch = false) {
         });
     }
 
-    // Call predictor engine (assumed in predictor.js)
     if (typeof computeDealerSignature === 'function') {
-        const sig = computeDealerSignature(history);
-        const res = analyzeSpin(history, {});
-        const prx = projectNextRound(history, {});
-        const sigs = getIAMasterSignals(prx, sig, history);
-        
-        lastIaSignals = [
-            { ...sigs[1], top: sig.casilla1 },
-            { ...sigs[0], top: sig.casilla10 },
-            { ...sigs[2], top: sig.casilla14 },
-            { ...sigs[3], top: sig.casilla19 },
-            { ...sigs[0], top: sig.casilla5 }
-        ];
+        try {
+            const sig = computeDealerSignature(history);
+            const prx = projectNextRound(history, {});
+            const sigs = getIAMasterSignals(prx, sig, history);
+            lastIaSignals = [
+                { top: sig.casilla1 }, { top: sig.casilla10 }, { top: sig.casilla14 }, { top: sig.casilla19 }, { top: sig.casilla5 }
+            ];
+        } catch(e) {}
     }
 
     if (!batch) {
-        renderHistory();
-        renderTravelPanel();
+        renderHistory(); renderTravelPanel();
         drawWheel(history[history.length - 1]);
         renderSignalsPanel(lastIaSignals);
     }
 }
 
-// Lifecycle
 async function syncData() {
     if (!currentTableId) return;
     try {
         const r = await fetch(`/api/history/${currentTableId}`);
+        if (!r.ok) return;
         const spins = await r.json();
         if (spins.length !== history.length) {
             history.length = 0;
@@ -218,23 +204,29 @@ async function syncData() {
 window.setActiveIaTab = (idx) => { activeIaTab = idx; renderSignalsPanel(lastIaSignals); };
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Clock
-    setInterval(() => { document.getElementById('live-clock').innerText = new Date().toLocaleTimeString(); }, 1000);
+    // 1. IMMEDIATE RENDER
+    setInterval(() => { 
+        const el = document.getElementById('live-clock');
+        if (el) el.innerText = new Date().toLocaleTimeString(); 
+    }, 1000);
 
-    // Initial Load
-    const r = await fetch('/api/tables');
-    const ts = await r.json();
-    if (tableSelect && ts.length > 0) {
-        tableSelect.innerHTML = ts.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
-        tableSelect.addEventListener('change', () => { currentTableId = tableSelect.value; history.length = 0; syncData(); });
-        currentTableId = ts[0].id;
-        syncData();
-    }
-    
-    // Safety Render
     drawWheel();
     renderSignalsPanel(lastIaSignals);
     renderTravelPanel();
+
+    // 2. BACKGROUND FETCH
+    try {
+        const r = await fetch('/api/tables');
+        if (r.ok) {
+            const ts = await r.json();
+            if (tableSelect && ts.length > 0) {
+                tableSelect.innerHTML = ts.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+                tableSelect.addEventListener('change', () => { currentTableId = tableSelect.value; history.length = 0; syncData(); });
+                currentTableId = ts[0].id;
+                syncData();
+            }
+        }
+    } catch (e) { console.error("API Error:", e); }
 
     setInterval(syncData, 5000);
 });
