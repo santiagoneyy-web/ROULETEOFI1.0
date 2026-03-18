@@ -126,6 +126,13 @@ function renderSignalsPanel(signals) {
     }
 }
 
+function renderTravelPanel() {
+    if (!travelTbody) return;
+    if (history.length < 2) {
+        travelTbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center; padding:30px;">Analyzing data...</td></tr>';
+        return;
+    }
+
     travelTbody.innerHTML = history.slice(-50).reverse().map((n, i) => {
         const idx = history.length - 1 - i;
         const prev = history[history.length - 2 - i];
