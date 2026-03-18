@@ -44,59 +44,73 @@ function drawWheel(highlightNum = null) {
     if (!wheelCtx) return;
     const ctx = wheelCtx;
     const cx = 110, cy = 110;
-    ctx.clearRect(0,0,220,220);
+    ctx.clearRect(0, 0, 220, 220);
 
-    // Outer Rim (Chrome effect)
-    const gr1 = ctx.createRadialGradient(cx, cy, 95, cx, cy, 105);
-    gr1.addColorStop(0, '#111');
-    gr1.addColorStop(0.5, '#444');
-    gr1.addColorStop(1, '#000');
-    ctx.beginPath(); ctx.arc(cx, cy, 100, 0, Math.PI*2);
-    ctx.strokeStyle = gr1; ctx.lineWidth = 10; ctx.stroke();
+    // 1. Bronze Outermost Circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, 105, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fill();
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
 
-    // Numbers track
-    ctx.beginPath(); ctx.arc(cx, cy, 80, 0, Math.PI*2);
-    ctx.strokeStyle = '#222'; ctx.lineWidth = 30; ctx.stroke();
-
+    // 2. Track & Pockets
     WHEEL_NUMS.forEach((n, i) => {
-        const ang = (i * (360 / 37) - 90) * (Math.PI / 180);
-        const x = cx + Math.cos(ang) * 80;
-        const y = cy + Math.sin(ang) * 80;
+        const startAng = (i * (360 / 37) - 90 - (360/74)) * (Math.PI / 180);
+        const endAng   = (i * (360 / 37) - 90 + (360/74)) * (Math.PI / 180);
+        const midAng   = (i * (360 / 37) - 90) * (Math.PI / 180);
 
         // Pocket Background
         ctx.beginPath();
-        ctx.arc(x, y, 12, 0, Math.PI * 2);
-        ctx.fillStyle = (n === 0) ? '#00b300' : (RED_NUMS.has(n) ? '#d61a3c' : '#000');
+        ctx.moveTo(cx + Math.cos(startAng) * 60, cy + Math.sin(startAng) * 60);
+        ctx.arc(cx, cy, 100, startAng, endAng);
+        ctx.lineTo(cx + Math.cos(endAng) * 60, cy + Math.sin(endAng) * 60);
+        ctx.closePath();
+        
+        ctx.fillStyle = (n === 0) ? '#008b00' : (RED_NUMS.has(n) ? '#c41e3a' : '#000');
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.strokeStyle = '#222'; ctx.lineWidth = 0.5; ctx.stroke();
 
-        // Highlight
+        // Numbers (Bigger & Clearer)
+        const rx = cx + Math.cos(midAng) * 82;
+        const ry = cy + Math.sin(midAng) * 82;
+        
+        ctx.save();
+        ctx.translate(rx, ry);
+        ctx.rotate(midAng + Math.PI/2);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px var(--mono)';
+        ctx.textAlign = 'center';
+        ctx.fillText(n, 0, 4);
+        ctx.restore();
+
+        // Highlight & Ball
         if (n === highlightNum) {
-            ctx.beginPath(); ctx.arc(x, y, 15, 0, Math.PI * 2);
+            ctx.beginPath();
+            ctx.arc(rx, ry, 14, 0, Math.PI * 2);
             ctx.strokeStyle = '#f5c842'; ctx.lineWidth = 3; ctx.stroke();
-            ctx.fillStyle = 'rgba(245,200,66,0.3)'; ctx.fill();
             
-            // Ball
-            const bx = cx + Math.cos(ang) * 98;
-            const by = cy + Math.sin(ang) * 98;
-            ctx.beginPath(); ctx.arc(bx, by, 6, 0, Math.PI*2);
+            // The actual ball
+            const bx = cx + Math.cos(midAng) * 105;
+            const by = cy + Math.sin(midAng) * 105;
+            ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI*2);
             ctx.fillStyle = '#fff'; ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
             ctx.fill(); ctx.shadowBlur = 0;
         }
-
-        // Real Numbers (Bigger & Clearer)
-        ctx.fillStyle = '#fff';
-        ctx.font = '900 11px var(--mono)';
-        ctx.textAlign = 'center';
-        ctx.fillText(n, x, y + 4);
     });
 
-    // Center Spindle
-    ctx.beginPath(); ctx.arc(cx, cy, 30, 0, Math.PI*2);
-    ctx.fillStyle = '#111'; ctx.fill();
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = '#f5c842'; ctx.font = '800 8px var(--font)';
-    ctx.fillText("PRO V3.1", cx, cy + 3);
+    // 3. Inner Spindle (Professional look)
+    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, 60);
+    gr.addColorStop(0, '#333');
+    gr.addColorStop(0.5, '#111');
+    gr.addColorStop(1, '#000');
+    ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI*2);
+    ctx.fillStyle = gr; ctx.fill();
+    ctx.strokeStyle = '#444'; ctx.lineWidth = 2; ctx.stroke();
+    
+    ctx.fillStyle = '#f5c842';
+    ctx.font = '800 9px var(--font)';
+    ctx.textAlign = 'center';
+    ctx.fillText("ELITE V3.1", cx, cy + 4);
 }
 
 function renderHistory() {
@@ -117,58 +131,36 @@ function updateClock() {
 setInterval(updateClock, 1000);
 
 function renderSignalsPanel(signals) {
-    const banner = document.getElementById('active-signal-container');
     const tabStrip = document.getElementById('strat-tabs');
-    if (!banner || !tabStrip) return;
+    if (!tabStrip) { console.warn("No strat-tabs found"); return; }
 
     try {
         const names = ['N17', 'N16', 'N17PLUS', 'N18', 'CELULA'];
         
         tabStrip.innerHTML = names.map((name, idx) => {
             const h = iaSignalsHistory[idx] || [];
-            const h15 = h.slice(-15);
-            const last = h[h.length-1];
-            const cls = last === 'win' ? 'tab-win' : (last === 'loss' ? 'tab-loss' : '');
-            
             const wTotal = h.filter(x => x === 'win').length;
             const hitTotal = h.length > 0 ? Math.round((wTotal / h.length) * 100) : 0;
             
-            const w15 = h15.filter(x => x === 'win').length;
-            const l15 = h15.filter(x => x === 'loss').length;
-            
-            return `<button class="nav-item ${idx === activeIaTab ? 'active' : ''} ${cls}" onclick="setActiveIaTab(${idx})">
-                <span style="font-weight:900;">${name}</span>
-                <span class="status-pill" style="margin-left:5px; background:rgba(255,255,255,0.03); opacity:0.8;">${hitTotal}%</span>
-                <span class="status-pill" style="opacity:0.4; font-size:0.55rem;">${w15}-${l15}</span>
+            return `<button class="nav-item ${idx === activeIaTab ? 'active' : ''}" onclick="setActiveIaTab(${idx})">
+                <span>${name}</span>
+                <span class="status-pill">${hitTotal}%</span>
             </button>`;
         }).join('');
 
         if (activeAgentLabel) activeAgentLabel.innerText = names[activeIaTab];
 
         const s = signals[activeIaTab];
-        if (!s || !s.top || s.rule === 'STOP') {
-            banner.innerHTML = '<div class="signal-idle" onclick="toggleDashboard()">⚡ WAITING FOR SPIN DATA... <span style="font-size:0.6rem; opacity:0.4;">(CLICK TO TOGGLE)</span></div>';
-            return;
+        if (topSignalEl) {
+            if (!s || !s.top || s.rule === 'STOP') {
+                topSignalEl.style.display = 'none';
+            } else {
+                topSignalEl.style.display = 'inline-block';
+                topSignalEl.innerText = `TARGET: ${s.top} | CONF: ${s.confidence || '85%'} | PLAY: ${s.small}-${s.big}`;
+                if (parseInt(s.confidence) > 50) topSignalEl.classList.add('signal-pulse');
+                else topSignalEl.classList.remove('signal-pulse');
+            }
         }
-
-        const isHighConfidence = s.confidence && parseInt(s.confidence) > 50;
-        banner.innerHTML = `
-            <div class="signal-toggle-header" onclick="toggleDashboard()" style="cursor:pointer; font-size:0.6rem; text-transform:uppercase; color:var(--text-dim); margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:5px; display:flex; justify-content:space-between;">
-                <span>Active Signal: ${names[activeIaTab]}</span>
-                <span>Click to Collapse</span>
-            </div>
-            <div class="signal-active-box">
-                <div class="signal-target-num">${s.top} <sup style="font-size:0.8rem; opacity:0.6;">n9</sup></div>
-                <div class="signal-label-pro">RECOMMENDED PLAY</div>
-                <div style="font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); margin-top:8px;">
-                    CONFIDENCE: <span style="color:var(--green); font-weight:800;">${s.confidence || '---'}</span> | 
-                    ZONE: ${s.small}-${s.big}
-                </div>
-            </div>`;
-        
-        if (isHighConfidence) banner.classList.add('signal-pulse-green');
-        else banner.classList.remove('signal-pulse-green');
-
     } catch (e) { console.error("Pro Signal Render Error:", e); }
 }
 
