@@ -455,7 +455,7 @@ function renderSignalsPanel(signals, sig, real) {
                         <div class="ia-side-box"><div class="ia-side-lbl">BIG</div><div class="ia-side-num">${s.big}<sup>n4</sup></div></div>
                     </div>
                     <div class="ia-slot-footer">
-                        <div class="ia-stats-mini">SESIÓN W: ${recommendedWin} L: ${recommendedLoss} | AGENTE W: ${iaWins[activeIaTab]} L: ${iaLosses[activeIaTab]}</div>
+                        <div class="ia-stats-mini">W: ${iaWins[activeIaTab]} L: ${iaLosses[activeIaTab]} | SESIÓN: W${recommendedWin} L${recommendedLoss}</div>
                         <div class="ia-reason">${sReason}</div>
                         <div class="ia-rule">${sRule}</div>
                     </div>
@@ -644,37 +644,9 @@ async function submitNumber(nOverride = null, skipApi = false, isSilent = false)
     numInput.value = '';
     numInput.focus();
 
-    // 1. Detección de HIT (usando la firma calculada ANTES de añadir el nuevo número)
-    if (history.length >= 2) {
-        const prevSig = computeDealerSignature(history);
-        if (prevSig && prevSig.avgTravel !== null) {
-            const smallZone = [prevSig.casilla5, ...wheelNeighbors(prevSig.casilla5, 4)];
-            const bigZone = [prevSig.casilla14, ...wheelNeighbors(prevSig.casilla14, 4)];
-            if (smallZone.includes(n)) {
-                topHitHistory.push('small');
-            } else if (bigZone.includes(n)) {
-                topHitHistory.push('big');
-            } else {
-                topHitHistory.push('miss');
-            }
-            if (topHitHistory.length > 12) topHitHistory.shift();
-        }
-    }
-
-    // 2. Actualizar historia
-    history.push(n);
-
-    if (isSilent) return; // Skip heavy UI/calc if silent batch mode
-
-    // Draw wheel with latest number highlighted
-    drawWheel(n);
-    renderHistory();
-
-    // 3. Detección de HIT para SEÑALES IA (evaluación por zona específica de cada agente)
-    // CRITICAL: We only evaluate ONCE per unique spin.
+    // 1. EVALUAR SEÑALES EXISTENTES (Hechas en la ronda anterior) contra el nuevo número N
     lastIaSignals.forEach((s, idx) => {
-        if (!s || s.evaluated) return; // Skip if already evaluated for this spin
-        s.evaluated = true; 
+        if (!s) return;
         
         let tpWin = false;
         const betZone = s.betZone || [];
@@ -695,59 +667,44 @@ async function submitNumber(nOverride = null, skipApi = false, isSilent = false)
         }
         if (iaSignalsHistory[idx].length > 15) iaSignalsHistory[idx].shift();
         
-        // ── Recommended Play Global Counter ──
+        // Sesión Global (Si es el agente activo)
         if (idx === activeIaTab) {
             if (tpWin) recommendedWin++; else recommendedLoss++;
         }
 
+        // Indicadores laterales de Hit
         const isSmall = s.small !== null && s.small !== undefined && wheelDistance(n, s.small) <= 4;
         const isBig   = s.big   !== null && s.big   !== undefined && wheelDistance(n, s.big)   <= 4;
-        
         let hitType = null;
         if (isSmall) hitType = 'SMALL';
         else if (isBig) hitType = 'BIG';
         lastIaHits[idx] = hitType;
     });
 
-    // Actualizar Auditoría de Sesión (Protocolo Pro)
-    if (lastIaSignals && lastIaSignals[0]) {
-        const fisica = lastIaSignals[0];
-        
-        // 1. Escudo (N9) hit check
-        const hitEscudo = wheelDistance(n, fisica.number) <= 9;
-        if (hitEscudo) auditStats['N9'].w++;
-        else auditStats['N9'].l++;
-        
-        // 2. Lanza (N4) hit check
-        const isSmall = (fisica.lanzaTarget === fisica.small);
-        const lanzaCategory = isSmall ? 'N4_S' : 'N4_B';
-        const hitLanza = wheelDistance(n, fisica.lanzaTarget) <= 4;
-        
-        if (hitLanza) auditStats[lanzaCategory].w++;
-        else auditStats[lanzaCategory].l++;
+    // 2. ACTUALIZAR HISTORIA
+    history.push(n);
+
+    // Polo check (Polo check usa el historial *antes* de la última firma)
+    if (history.length >= 2) {
+        const hPrev = history.slice(0, -1);
+        const prevSig = computeDealerSignature(hPrev);
+        if (prevSig && prevSig.avgTravel !== null) {
+            const smallZone = [prevSig.casilla5, ...wheelNeighbors(prevSig.casilla5, 4)];
+            const bigZone = [prevSig.casilla14, ...wheelNeighbors(prevSig.casilla14, 4)];
+            if (smallZone.includes(n)) topHitHistory.push('small');
+            else if (bigZone.includes(n)) topHitHistory.push('big');
+            else topHitHistory.push('miss');
+            if (topHitHistory.length > 12) topHitHistory.shift();
+        }
     }
 
+    // 3. GENERAR NUEVAS PREDICCIONES (Para la siguiente tirada)
     const sig = computeDealerSignature(history);
-
-    if (history.length < 3) {
-        const needed = 3 - history.length;
-        statusMsg.textContent = `Faltan ${needed} número${needed > 1 ? 's' : ''} más.`;
-        statusMsg.className = 'status-msg status-info';
-        buildStratTabs(null);
-        renderTravelPanel(sig);
-        return;
-    }
-
-    statusMsg.textContent = `#${history.length}: ${n}`;
-    statusMsg.className = 'status-msg status-ok';
-
     const results = analyzeSpin(history, stats);
     const prox    = projectNextRound(history, stats);
-    
-    // 5. Señales IA (basadas en resultados actuales para la SIGUIENTE tirada)
     const signals = getIAMasterSignals(prox, sig, history) || [];
     
-    // Inject Agent 5 (Backend AI)
+    // Inyectar Agente 5 (Backend AI)
     signals.push({
         name: 'IA AUTÓNOMA',
         number: latestAgent5Top,
@@ -758,9 +715,25 @@ async function submitNumber(nOverride = null, skipApi = false, isSilent = false)
         rule: latestAgent5Top !== null ? "ESTADÍSTICA PURA N9" : "CARGANDO...",
         mode: 'ESCUDO'
     });
-    
-    lastIaSignals = signals.length ? signals : [null, null, null, null, null];
 
+    lastIaSignals = signals;
+
+    // Auditoría Pro (Física)
+    if (lastIaSignals && lastIaSignals[0]) {
+        const fisica = lastIaSignals[0];
+        const hitEscudo = wheelDistance(n, fisica.number) <= 9;
+        if (hitEscudo) auditStats['N9'].w++; else auditStats['N9'].l++;
+        const isSmallFis = (fisica.lanzaTarget === fisica.small);
+        const lanzaCategory = isSmallFis ? 'N4_S' : 'N4_B';
+        const hitLanza = wheelDistance(n, fisica.lanzaTarget) <= 4;
+        if (hitLanza) auditStats[lanzaCategory].w++; else auditStats[lanzaCategory].l++;
+    }
+
+    if (isSilent) return;
+
+    // 4. Actualizar UI
+    drawWheel(n);
+    renderHistory();
     renderTravelPanel(sig, signals);
     buildStratTabs(results);
     renderTargetPanel(results, n);
