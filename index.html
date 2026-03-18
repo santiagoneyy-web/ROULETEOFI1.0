@@ -2,113 +2,108 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ROULETTE PREDICTOR PRO v3.1</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>ROULETTE PREDICTOR PRO</title>
     <link rel="stylesheet" href="styles.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
 </head>
 <body>
+<div class="app-shell">
 
-<div class="pro-dashboard app-layout">
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <div class="logo-circ">
-                <img src="https://cdn-icons-png.flaticon.com/512/1055/1055644.png" alt="Logo">
+    <!-- ═══ TOP BAR ═══ -->
+    <header class="top-bar">
+        <div class="top-bar-left">
+            <span class="app-logo">🎰</span>
+            <span class="app-title">ROULETTE PRO</span>
+        </div>
+        <div class="top-bar-right">
+            <select id="table-select" class="compact-select"></select>
+            <span class="live-clock" id="live-clock">00:00:00</span>
+        </div>
+    </header>
+
+    <!-- ═══ AGENT TABS ═══ -->
+    <nav class="agent-tab-bar" id="strat-tabs"></nav>
+
+    <!-- ═══ AGENT CARD ═══ -->
+    <section class="agent-card" id="agent-card">
+        <div class="agent-card-header">
+            <span class="agent-icon">🤖</span>
+            <span class="agent-card-name" id="active-agent-name">ANDROID N17</span>
+            <span class="agent-confidence" id="agent-confidence">0%</span>
+        </div>
+
+        <div class="agent-strategy-label" id="agent-strategy">--</div>
+
+        <!-- Wheel dots (visual flair) -->
+        <div class="wheel-dots">
+            <span class="wd"></span><span class="wd"></span><span class="wd"></span>
+        </div>
+
+        <div class="agent-status-row" id="agent-status-row">
+            <span class="status-line" id="agent-status">BUSCANDO EN BASE DE DATOS...</span>
+        </div>
+        <div class="agent-sync-row" id="agent-sync">SINCRONIZANDO BDD...</div>
+
+        <!-- Bottom play info -->
+        <div class="play-info-bar" id="play-info-bar">
+            <div class="play-chip">
+                <span class="pi-label">JUGAR</span>
+                <span class="pi-val" id="pi-zone">--</span>
             </div>
-            <div class="logo-text">
-                ROULETTE PREDICTOR PRO
-                <span>v3.1</span>
+            <div class="play-chip">
+                <span class="pi-label">CASILLA</span>
+                <span class="pi-val" id="pi-casilla">--</span>
+            </div>
+            <div class="play-chip target-chip">
+                <span class="pi-val big-target" id="target-number">--</span>
+                <span class="pi-label"><span id="pi-radius">N9</span></span>
+            </div>
+            <div class="play-chip wl-chip">
+                <span class="pi-label">W:<span id="agent-wins">0</span></span>
+                <span class="pi-label">L:<span id="agent-losses">0</span></span>
             </div>
         </div>
 
-        <nav class="sidebar-nav">
-            <button class="nav-item active" data-view="dashboard">📊 Dashboard</button>
-            <button class="nav-item" data-view="agents">👥 Agents</button>
-            <button class="nav-item" data-view="analysis">📈 Analysis</button>
-            <button class="nav-item" data-view="settings">⚙️ Settings</button>
-        </nav>
-        
-        <div class="sidebar-footer">
-            <div class="status-indicator">
-                <span class="status-dot"></span>
-                System Online
+        <!-- History dots -->
+        <div class="result-dots" id="result-dots">
+            <span class="rd rd-loss">L</span>
+            <span class="rd rd-loss">L</span>
+        </div>
+    </section>
+
+    <!-- ═══ SUBMIT NUMBER ═══ -->
+    <section class="submit-section">
+        <input type="number" id="spin-number" min="0" max="36" placeholder="Nº (0-36)" class="spin-input" />
+        <button class="spin-btn" onclick="submitNumber()">▶ REGISTRAR</button>
+    </section>
+
+    <!-- ═══ TRAVEL DATA ═══ -->
+    <section class="travel-section">
+        <div class="travel-top-bar">
+            <span class="section-title">📊 TRAVEL DATA</span>
+            <div class="travel-badges">
+                <span class="badge badge-stable" id="travel-pattern">ESTABLE</span>
+                <span class="badge badge-zone" id="travel-last-zone">LAST: --</span>
             </div>
         </div>
-    </aside>
-
-    <!-- MAIN VIEW -->
-    <main class="main-view">
-        <header class="top-bar">
-            <div class="top-left">
-                <div class="header-title">ROULETTE PREDICTOR PRO <span>v3.1</span></div>
-            </div>
-            <div class="clock" id="live-clock">00:00:00</div>
-            <div class="top-right">
-                <select id="table-select" class="pro-select"></select>
-                <div class="active-agent-label">
-                    Agent: <span id="active-agent-name">N17</span>
-                </div>
-            </div>
-        </header>
-
-        <div class="dashboard-content">
-            <div class="active-agent-wrapper">
-                <div class="section-label">ACTIVE AGENT</div>
-                <!-- AGENT TABS -->
-                <div class="ia-tabs-strip-pro" id="strat-tabs"></div>
-
-                <!-- 3-COLUMN PREDICTION GRID -->
-                <div class="prediction-grid-pro" id="prediction-grid">
-                    <div class="pred-box box-cyan">
-                        <div class="pred-label">PREDICTION</div>
-                        <div id="pred-small-val" class="pred-value">SMALL</div>
-                        <div class="pred-sub">1-9</div>
-                    </div>
-                    <div class="pred-box box-gold">
-                        <div class="pred-label">TOP TARGET</div>
-                        <div id="target-number" class="pred-value-big">--</div>
-                        <div class="pred-sub">TARGETED POCKET</div>
-                    </div>
-                    <div class="pred-box box-cyan">
-                        <div class="pred-label">PREDICTION</div>
-                        <div id="pred-big-val" class="pred-value">BIG</div>
-                        <div class="pred-sub">10-18</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TRAVEL DATA -->
-            <section class="panel travel-panel-pro">
-                <div class="travel-header-banner">TRAVEL DATA - DETAILED SPIN HISTORY</div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>N</th>
-                                <th>NUMBER</th>
-                                <th>DISTANCE</th>
-                                <th>DIRECTION</th>
-                                <th>PHASE (S/B)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="travel-tbody">
-                            <tr><td colspan="5" class="muted">Select a table to begin analysis...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+        <div class="travel-table-wrap">
+            <table class="travel-table">
+                <thead>
+                    <tr>
+                        <th>N°</th>
+                        <th>DIST</th>
+                        <th>DIR</th>
+                        <th>PHASE</th>
+                    </tr>
+                </thead>
+                <tbody id="travel-tbody">
+                    <tr><td colspan="4" class="muted">Selecciona una mesa...</td></tr>
+                </tbody>
+            </table>
         </div>
-    </main>
+    </section>
 
-    <!-- RIGHT VISUAL SIDEBAR -->
-    <aside class="visual-panel">
-        <div class="panel-header">LIVE CYLINDER</div>
-        <div class="wheel-box">
-            <canvas id="wheel-canvas" width="220" height="220"></canvas>
-        </div>
-        <div id="history-strip" class="history-strip-top"></div>
-    </aside>
 </div>
 
 <script src="predictor.js"></script>

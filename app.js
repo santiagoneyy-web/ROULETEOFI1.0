@@ -1,29 +1,25 @@
 // ============================================================
-// app.js — BULLETPROOF INITIALIZATION
+// app.js — COMPACT MOBILE UI ENGINE (Phase 30)
 // ============================================================
 
 const history      = [];
 const iaSignalsHistory = [ [], [], [], [], [] ]; 
 let activeIaTab    = 0; 
 let lastIaSignals = [
-    { top: 17, rule: 'READY' },
-    { top: 16, rule: 'READY' },
-    { top: 5,  rule: 'READY' },
-    { top: 22, rule: 'READY' },
-    { top: 10, rule: 'READY' }
+    { top: 17, rule: 'READY', radius:'N9' },
+    { top: 16, rule: 'READY', radius:'N2/N3' },
+    { top: 5,  rule: 'READY', radius:'N9' },
+    { top: 22, rule: 'READY', radius:'N9' },
+    { top: 10, rule: 'READY', radius:'N4' }
 ]; 
 
-const RED_NUMS = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
-const WHEEL_NUMS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+// Agent names as per user request
+const AGENT_NAMES   = ['Android N17', 'Android N16', 'Android 1717', 'Android N18', 'CÉLULA'];
+const AGENT_KEYS    = ['N17', 'N16', 'N17PLUS', 'N18', 'CELULA'];
+const AGENT_MODES   = ['SOPORTE/HIBRIDO', 'SIX STRATEGIE', 'HIBRIDO/ZIGZAG', 'SOPORTE PURO', 'SNIPER'];
 
-// Selectors
-const activeAgentLabel = document.getElementById('active-agent-name');
-const historyEl       = document.getElementById('history-strip');
-const tableSelect     = document.getElementById('table-select');
-const travelTbody     = document.getElementById('travel-tbody');
-const targetNumEl     = document.getElementById('target-number');
-const wheelCanvas     = document.getElementById('wheel-canvas');
-const wheelCtx        = wheelCanvas ? wheelCanvas.getContext('2d') : null;
+const RED_NUMS  = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+const WHEEL_NUMS = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
 
 let currentTableId = null;
 
@@ -37,185 +33,205 @@ function calcDist(from, to) {
     return d;
 }
 
-function drawWheel(highlightNum = null) {
-    if (!wheelCtx) return;
-    const ctx = wheelCtx;
-    const cx = 110, cy = 110;
-    ctx.clearRect(0, 0, 220, 220);
-
-    const goldColor = '#f5c842';
-
-    ctx.beginPath(); ctx.arc(cx, cy, 105, 0, Math.PI * 2);
-    ctx.fillStyle = '#1a1a1a'; ctx.fill();
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
-
-    WHEEL_NUMS.forEach((n, i) => {
-        const startAng = (i * (360 / 37) - 90 - (360/74)) * (Math.PI / 180);
-        const endAng   = (i * (360 / 37) - 90 + (360/74)) * (Math.PI / 180);
-        const midAng   = (i * (360 / 37) - 90) * (Math.PI / 180);
-
-        ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(startAng) * 60, cy + Math.sin(startAng) * 60);
-        ctx.arc(cx, cy, 100, startAng, endAng);
-        ctx.lineTo(cx + Math.cos(endAng) * 60, cy + Math.sin(endAng) * 60);
-        ctx.closePath();
-        
-        ctx.fillStyle = (n === 0) ? '#008b00' : (RED_NUMS.has(n) ? '#c41e3a' : '#000');
-        ctx.fill();
-        ctx.strokeStyle = '#222'; ctx.lineWidth = 0.5; ctx.stroke();
-
-        const rx = cx + Math.cos(midAng) * 82;
-        const ry = cy + Math.sin(midAng) * 82;
-        
-        ctx.save();
-        ctx.translate(rx, ry); ctx.rotate(midAng + Math.PI/2);
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 11px Inter';
-        ctx.textAlign = 'center'; ctx.fillText(n, 0, 4);
-        ctx.restore();
-
-        if (n === highlightNum) {
-            ctx.beginPath(); ctx.arc(rx, ry, 14, 0, Math.PI * 2);
-            ctx.strokeStyle = goldColor; ctx.lineWidth = 3; ctx.stroke();
-            const bx = cx + Math.cos(midAng) * 105;
-            const by = cy + Math.sin(midAng) * 105;
-            ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI*2);
-            ctx.fillStyle = '#fff'; ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
-            ctx.fill(); ctx.shadowBlur = 0;
-        }
-    });
-
-    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, 60);
-    gr.addColorStop(0, '#333'); gr.addColorStop(1, '#000');
-    ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI*2);
-    ctx.fillStyle = gr; ctx.fill();
-}
-
-function renderHistory() {
-    if (!historyEl) return;
-    historyEl.innerHTML = history.slice(-15).reverse().map((n, idx) => {
-        const color = (n === 0) ? 'green' : (RED_NUMS.has(n) ? 'red' : 'black');
-        return `<div class="hist-ball hist-${color} ${idx === 0 ? 'hist-latest' : ''}">${n}</div>`;
-    }).join('');
-}
-
-function renderSignalsPanel(signals) {
-    const tabStrip = document.getElementById('strat-tabs');
-    if (!tabStrip) return;
-
-    const names = ['N17', 'N16', 'N17PLUS', 'N18', 'CELULA'];
-    tabStrip.innerHTML = names.map((name, idx) => {
+// ─── RENDER: AGENT TABS ────────────────────────────────────
+function renderTabs() {
+    const strip = document.getElementById('strat-tabs');
+    if (!strip) return;
+    strip.innerHTML = AGENT_KEYS.map((key, idx) => {
         const h = iaSignalsHistory[idx] || [];
-        const winCount = h.filter(x => x === 'win').length;
-        const wL = `W-L ${winCount}-${h.length - winCount}`;
-        return `<div class="ia-tab ${idx === activeIaTab ? 'active' : ''}" onclick="setActiveIaTab(${idx})">
-            <span>${name}</span>
-            <div class="stat-line">${wL}</div>
-        </div>`;
+        const wins = h.filter(x => x === 'win').length;
+        const active = idx === activeIaTab;
+        return `<button class="ia-tab ${active ? 'active' : ''}" onclick="setActiveIaTab(${idx})">
+            ${key}
+            <span class="wl">W-L ${wins}-${h.length - wins}</span>
+        </button>`;
     }).join('');
+}
 
-    if (activeAgentLabel) activeAgentLabel.innerText = names[activeIaTab];
-
+// ─── RENDER: AGENT CARD ────────────────────────────────────
+function renderAgentCard(signals) {
     const s = signals[activeIaTab];
-    if (targetNumEl) targetNumEl.innerText = (s && s.top) ? s.top : '--';
-    
-    const smallBox = document.getElementById('pred-small-val');
-    const bigBox = document.getElementById('pred-big-val');
-    const targetLabel = document.querySelector('.target-box .label');
+    if (!s) return;
 
-    if (targetLabel && s) {
-        targetLabel.innerText = s.radius ? `TARGET POCKET (${s.radius})` : 'TARGETED POCKET';
+    const nameEl    = document.getElementById('active-agent-name');
+    const confEl    = document.getElementById('agent-confidence');
+    const stratEl   = document.getElementById('agent-strategy');
+    const statusEl  = document.getElementById('agent-status');
+    const syncEl    = document.getElementById('agent-sync');
+    const targetEl  = document.getElementById('target-number');
+    const radiusEl  = document.getElementById('pi-radius');
+    const zoneEl    = document.getElementById('pi-zone');
+    const casillaEl = document.getElementById('pi-casilla');
+    const winsEl    = document.getElementById('agent-wins');
+    const lossesEl  = document.getElementById('agent-losses');
+    const dotsEl    = document.getElementById('result-dots');
+
+    if (nameEl)   nameEl.innerText   = AGENT_NAMES[activeIaTab];
+    if (confEl)   confEl.innerText   = s.confidence || '0%';
+    if (stratEl)  stratEl.innerText  = s.rule || AGENT_MODES[activeIaTab];
+    if (statusEl) statusEl.innerText = s.reason || 'ANALIZANDO...';
+    if (syncEl)   syncEl.innerText   = s.mode ? `MODO: ${s.mode}` : 'SINCRONIZANDO BDD...';
+    if (targetEl) targetEl.innerText = s.top !== undefined ? s.top : '--';
+    if (radiusEl) radiusEl.innerText = s.radius || 'N9';
+
+    // Zone label
+    const top = s.top;
+    if (zoneEl) {
+        if (top >= 1 && top <= 9)        { zoneEl.innerText = 'SMALL'; zoneEl.style.color = 'var(--green)'; }
+        else if (top >= 10 && top <= 19) { zoneEl.innerText = 'BIG';   zoneEl.style.color = 'var(--red)'; }
+        else                             { zoneEl.innerText = '--';     zoneEl.style.color = 'var(--muted)'; }
     }
 
-    if (smallBox && bigBox && s && s.top) {
-        const smallLabel = smallBox.parentElement.querySelector('.label');
-        const bigLabel = bigBox.parentElement.querySelector('.label');
+    // Casilla
+    if (casillaEl) casillaEl.innerText = top !== undefined ? top : '--';
 
-        if (s.top >= 1 && s.top <= 9) {
-            smallBox.innerText = s.top;
-            smallBox.style.opacity = '1';
-            if (smallLabel) smallLabel.innerText = "SMALL (N4)";
-            
-            bigBox.innerText = 'BIG';
-            bigBox.style.opacity = '0.3';
-            if (bigLabel) bigLabel.innerText = "BIG 10-18";
-        } else if (s.top >= 10 && s.top <= 19) {
-            bigBox.innerText = s.top;
-            bigBox.style.opacity = '1';
-            if (bigLabel) bigLabel.innerText = "BIG (N4)";
-            
-            smallBox.innerText = 'SMALL';
-            smallBox.style.opacity = '0.3';
-            if (smallLabel) smallLabel.innerText = "SMALL 1-9";
-        } else {
-            smallBox.innerText = 'SMALL';
-            bigBox.innerText = 'BIG';
-            smallBox.style.opacity = '0.3';
-            bigBox.style.opacity = '0.3';
-            if (smallLabel) smallLabel.innerText = "SMALL 1-9";
-            if (bigLabel) bigLabel.innerText = "BIG 10-18";
-        }
+    // W-L
+    const h = iaSignalsHistory[activeIaTab] || [];
+    const wins = h.filter(x => x === 'win').length;
+    const losses = h.length - wins;
+    if (winsEl)   winsEl.innerText   = wins;
+    if (lossesEl) lossesEl.innerText = losses;
+
+    // Result dots (last 5)
+    if (dotsEl) {
+        const last5 = h.slice(-5);
+        dotsEl.innerHTML = last5.map(r =>
+            `<span class="rd ${r === 'win' ? 'rd-win' : 'rd-loss'}">${r === 'win' ? 'W' : 'L'}</span>`
+        ).join('');
     }
 }
 
+// ─── RENDER: ALL SIGNALS ───────────────────────────────────
+function renderSignalsPanel(signals) {
+    renderTabs();
+    renderAgentCard(signals);
+}
+
+// ─── RENDER: TRAVEL TABLE ──────────────────────────────────
 function renderTravelPanel() {
-    if (!travelTbody) return;
+    const tbody   = document.getElementById('travel-tbody');
+    const patEl   = document.getElementById('travel-pattern');
+    const lastZEl = document.getElementById('travel-last-zone');
+    if (!tbody) return;
+
     if (history.length < 2) {
-        travelTbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center; padding:30px;">Analyzing data...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="muted">Selecciona una mesa...</td></tr>';
         return;
     }
 
-    travelTbody.innerHTML = history.slice(-50).reverse().map((n, i) => {
-        const idx = history.length - 1 - i;
-        const prev = history[history.length - 2 - i];
-        const dist = (prev !== undefined) ? calcDist(prev, n) : 0;
-        const color = (n === 0) ? 'val-up' : (RED_NUMS.has(n) ? 'val-down' : '');
+    // Pattern badge
+    if (patEl) {
+        const last5 = history.slice(-5);
+        const bigCount   = last5.filter(n => n >= 10 && n <= 19).length;
+        const smallCount = last5.filter(n => n >= 1 && n <= 9).length;
+        const dirs = [];
+        for (let i = history.length - 4; i < history.length; i++) {
+            if (i > 0) dirs.push(calcDist(history[i-1], history[i]) > 0 ? 'D' : 'I');
+        }
+        const isZigZagDir = dirs.length >= 2 && dirs[dirs.length-1] !== dirs[dirs.length-2];
         
-        let phase = ''; // Remove ULTRA-BIG/Other labels
-        if (n >= 1 && n <= 9) phase = 'SMALL';
-        else if (n >= 10 && n <= 19) phase = 'BIG';
+        let pat = 'ESTABLE', patClass = 'badge-stable';
+        if (isZigZagDir) { pat = 'ZIG ZAG ↔'; patClass = 'badge-zigzag'; }
+        else if (bigCount >= 3) { pat = 'BIG TREND'; patClass = 'badge-zone'; }
+        else if (smallCount >= 3) { pat = 'SMALL TREND'; patClass = 'badge-stable'; }
+        
+        patEl.textContent = pat;
+        patEl.className = `badge ${patClass}`;
+    }
 
+    // Last zone badge
+    const lastN = history[history.length - 1];
+    if (lastZEl) {
+        if (lastN >= 1 && lastN <= 9)        { lastZEl.textContent = 'LAST: SMALL'; lastZEl.style.color = 'var(--green)'; }
+        else if (lastN >= 10 && lastN <= 19) { lastZEl.textContent = 'LAST: BIG';   lastZEl.style.color = 'var(--red)'; }
+        else                                 { lastZEl.textContent = `LAST: ${lastN}`; lastZEl.style.color = 'var(--muted)'; }
+    }
+
+    tbody.innerHTML = history.slice(-50).reverse().map((n, i) => {
+        const idxInHistory = history.length - 1 - i;
+        const prev = history[idxInHistory - 1];
+        const dist = (prev !== undefined) ? calcDist(prev, n) : 0;
+        const absDist = Math.abs(dist);
+        const dir  = dist > 0 ? 'DER.' : (dist < 0 ? 'IZQ.' : '--');
+        
+        const numClass = (n === 0) ? 'num-zero' : (RED_NUMS.has(n) ? 'num-red' : 'num-black');
+        const dirClass = dist >= 0 ? 'dir-der' : 'dir-izq';
+        
+        let phaseHtml = '';
+        if (n >= 1 && n <= 9)        phaseHtml = `<span class="phase-small">SMALL</span>`;
+        else if (n >= 10 && n <= 19) phaseHtml = `<span class="phase-big">BIG</span>`;
+
+        const isLast = (i === 0);
         return `<tr>
-            <td>${idx + 1}</td>
-            <td class="${color}" style="font-weight:900;">${n}</td>
-            <td style="color:var(--text);">${Math.abs(dist)}</td>
-            <td style="color:var(--accent); font-weight:800;">${dist >= 0 ? 'DERECHA' : 'IZQUIERDA'}</td>
-            <td style="font-weight:900; color:${phase === 'SMALL' ? 'var(--green)' : (phase === 'BIG' ? 'var(--red)' : '#fff')}">${phase}</td>
+            <td class="row-n ${isLast ? 'last-row' : ''}">${idxInHistory + 1}${isLast ? '<span style="font-size:8px;color:var(--accent)"> ★</span>' : ''}</td>
+            <td class="${numClass}">${n}</td>
+            <td style="color:var(--text2)">${absDist}p</td>
+            <td class="${dirClass}">${dir} <span style="font-size:9px;opacity:0.6">↺</span></td>
+            <td>${phaseHtml}</td>
         </tr>`;
     }).join('');
 }
 
-async function submitNumber(val, silent = false, batch = false) {
-    let n = parseInt(val);
+// ─── SUBMIT NUMBER ─────────────────────────────────────────
+function submitNumber(val, silent = false, batch = false) {
+    const inputEl = document.getElementById('spin-number');
+    const raw = val !== undefined ? val : (inputEl ? inputEl.value : '');
+    const n = parseInt(raw);
+    
     if (!isNaN(n) && n >= 0 && n <= 36) {
-        history.push(n);
+        // Evaluate previous predictions
         lastIaSignals.forEach((s, idx) => {
-            if (!s) return;
-            const target = s.top;
-            if (target !== null) {
-                const win = (Math.abs(calcDist(n, target)) <= 4);
-                iaSignalsHistory[idx].push(win ? 'win' : 'loss');
-            }
+            if (!s || s.top === undefined || s.top === null) return;
+            const radius = s.radius === 'N4' ? 4 : 9;
+            const win = Math.abs(calcDist(n, s.top)) <= radius;
+            iaSignalsHistory[idx].push(win ? 'win' : 'loss');
         });
-    }
+        
+        history.push(n);
+        if (inputEl && !batch) inputEl.value = '';
 
-    if (typeof computeDealerSignature === 'function') {
-        try {
-            const sig = computeDealerSignature(history);
-            const prx = projectNextRound(history, {});
-            const sigs = getIAMasterSignals(prx, sig, history);
-            lastIaSignals = [
-                { top: sig.casilla1 }, { top: sig.casilla10 }, { top: sig.casilla14 }, { top: sig.casilla19 }, { top: sig.casilla5 }
-            ];
-        } catch(e) {}
+        // Compute new predictions
+        if (typeof computeDealerSignature === 'function' && history.length >= 3) {
+            try {
+                const sig  = computeDealerSignature(history);
+                const prox = projectNextRound(history, {});
+                const masterSignals = getIAMasterSignals(prox, sig, history);
+                
+                if (masterSignals && masterSignals.length > 0) {
+                    const ag17   = masterSignals.find(s => s.name === 'Android n17');
+                    const ag16   = masterSignals.find(s => s.name === 'Android n16');
+                    const ag1717 = masterSignals.find(s => s.name === 'Android 1717');
+                    const agN18  = masterSignals.find(s => s.name === 'N18');
+                    const agCel  = masterSignals.find(s => s.name === 'CELULA');
+                    
+                    lastIaSignals = [
+                        { top: ag17?.number,   confidence: ag17?.confidence,   reason: ag17?.reason,   rule: ag17?.rule,   mode: ag17?.mode,   radius: ag17?.radius   || 'N9'  },
+                        { top: ag16?.tp,        confidence: ag16?.confidence,   reason: ag16?.reason,   rule: ag16?.rule,   mode: ag16?.mode,   radius: 'N2/N3',        tp: ag16?.tp, cors: ag16?.cor },
+                        { top: ag1717?.number, confidence: ag1717?.confidence, reason: ag1717?.reason, rule: ag1717?.rule, mode: ag1717?.mode, radius: ag1717?.radius || 'N9'  },
+                        { top: agN18?.number,  confidence: agN18?.confidence,  reason: agN18?.reason,  rule: agN18?.rule,  mode: agN18?.mode,  radius: agN18?.radius  || 'N9'  },
+                        { top: agCel?.number,  confidence: agCel?.confidence,  reason: agCel?.reason,  rule: agCel?.rule,  mode: agCel?.mode,  radius: agCel?.radius  || 'N4'  }
+                    ];
+                }
+            } catch(e) { console.error('Predict error:', e); }
+        }
+
+        // Post to backend (non-blocking)
+        if (currentTableId && !batch) {
+            fetch('/api/spin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ table_id: currentTableId, number: n, source: 'manual' })
+            }).catch(() => {});
+        }
     }
 
     if (!batch) {
-        renderHistory(); renderTravelPanel();
-        drawWheel(history[history.length - 1]);
         renderSignalsPanel(lastIaSignals);
+        renderTravelPanel();
     }
 }
 
+// ─── SYNC FROM SERVER ──────────────────────────────────────
 async function syncData() {
     if (!currentTableId) return;
     try {
@@ -225,38 +241,51 @@ async function syncData() {
         if (spins.length !== history.length) {
             history.length = 0;
             iaSignalsHistory.forEach(h => h.length = 0);
-            for (const s of spins) await submitNumber(s.number, true, true);
-            submitNumber(null, true, false);
+            for (const s of spins) submitNumber(s.number, true, true);
+            renderSignalsPanel(lastIaSignals);
+            renderTravelPanel();
         }
     } catch(e) {}
 }
 
-window.setActiveIaTab = (idx) => { activeIaTab = idx; renderSignalsPanel(lastIaSignals); };
+// ─── TAB SWITCH ───────────────────────────────────────────
+window.setActiveIaTab = (idx) => {
+    activeIaTab = idx;
+    renderSignalsPanel(lastIaSignals);
+};
 
+// ─── INIT ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. IMMEDIATE RENDER
-    setInterval(() => { 
+    // Clock
+    setInterval(() => {
         const el = document.getElementById('live-clock');
-        if (el) el.innerText = new Date().toLocaleTimeString(); 
+        if (el) el.innerText = new Date().toLocaleTimeString();
     }, 1000);
 
-    drawWheel();
+    // Immediate render with placeholders
     renderSignalsPanel(lastIaSignals);
     renderTravelPanel();
 
-    // 2. BACKGROUND FETCH
+    // Load tables from API
     try {
         const r = await fetch('/api/tables');
         if (r.ok) {
             const ts = await r.json();
+            const tableSelect = document.getElementById('table-select');
             if (tableSelect && ts.length > 0) {
                 tableSelect.innerHTML = ts.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
-                tableSelect.addEventListener('change', () => { currentTableId = tableSelect.value; history.length = 0; syncData(); });
+                tableSelect.addEventListener('change', () => {
+                    currentTableId = tableSelect.value;
+                    history.length = 0;
+                    iaSignalsHistory.forEach(h => h.length = 0);
+                    syncData();
+                });
                 currentTableId = ts[0].id;
                 syncData();
             }
         }
-    } catch (e) { console.error("API Error:", e); }
+    } catch (e) { console.warn('API not reachable, offline mode.'); }
 
+    // Poll for updates every 5s
     setInterval(syncData, 5000);
 });
