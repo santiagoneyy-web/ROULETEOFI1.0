@@ -141,13 +141,12 @@ app.post('/api/spin', async (req, res) => {
 
             // Agent 5 (Historical Similarity)
             // It now works with both Mongo and JSON as fallback
-            const historyCount = numsOnly.length;
-            if (historyCount >= 50) {
-                const ag5Top = await agent5.predictAgent5(table_id, numsOnly);
+            const ag5Top = await agent5.predictAgent5(table_id, numsOnly);
+            if (ag5Top !== null) {
                 newPredictions.agent5_top = ag5Top;
-                console.log(`🤖 [Agent 5] Generated prediction based on ${historyCount} spins.`);
-            } else {
-                console.log(`⏳ [Agent 5] Waiting for more data (${historyCount}/50)...`);
+                console.log(`🤖 [Agent 5] Generated prediction based on ${numsOnly.length} spins.`);
+            } else if (numsOnly.length < 50) {
+                console.log(`⏳ [Agent 5] Learning mode: (${numsOnly.length}/50) spins collected.`);
             }
         }
 

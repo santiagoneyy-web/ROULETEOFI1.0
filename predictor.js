@@ -597,7 +597,19 @@ function getIAMasterSignals(prox, sig, history) {
         return { val, conf: confStr, rule, reason, mode };
     };
 
-    const fis = getFinalSignal(escudoTarget, finalConf, finalRule, finalReason, 'ESCUDO');
+    const MIN_CONFID_VALUE = 70;
+    
+    function filterLowConfidence(signal) {
+        if (!signal.conf) return { ...signal, val: null };
+        const val = parseInt(signal.conf);
+        if (isNaN(val) || val < MIN_CONFID_VALUE) {
+            return { ...signal, val: null, rule: 'PAUSA (BAJA CONF.)', reason: 'SEÑAL INESTABLE' };
+        }
+        return signal;
+    }
+
+    let fis = getFinalSignal(escudoTarget, finalConf, finalRule, finalReason, 'ESCUDO');
+    fis = filterLowConfidence(fis);
     
     // Agent 1: FISICA STUDIO (Physical Matrix - TOP NUMBER N9)
     signals.push({
@@ -616,7 +628,8 @@ function getIAMasterSignals(prox, sig, history) {
 
     // Agent 2: SIX STRATEGIE (Mathematical Momentum)
     const bestStrat = getBestMathematicalStrategy(prox);
-    const six = getFinalSignal(bestStrat.tp, (bestStrat.momentum > 0 ? "92%" : "85%"), bestStrat.rule, "MOMENTUM MATEMÁTICO", 'MATH');
+    let six = getFinalSignal(bestStrat.tp, (bestStrat.momentum > 0 ? "92%" : "85%"), bestStrat.rule, "MOMENTUM MATEMÁTICO", 'MATH');
+    six = filterLowConfidence(six);
     
     signals.push({
         name: 'SIX STRATEGIE',
@@ -714,7 +727,7 @@ function getIAMasterSignals(prox, sig, history) {
         soporteReason = 'DIRECCIÓN DEBILITADA → INTERCEPCIÓN';
     }
 
-    signals.push({
+    let sop = {
         name: 'SOPORTE PRO',
         number: soporteNum,
         small: sig.casilla5,
@@ -726,6 +739,29 @@ function getIAMasterSignals(prox, sig, history) {
         rule: soporteRule,
         mode: soporteMode,
         targetZone: sig.recommendedPlay
+    };
+
+    // Apply filter to all
+    const filteredAndroid = filterLowConfidence({ val: androidTarget, conf: androidConf, rule: androidRule, reason: androidReason });
+    const filteredSoporte = filterLowConfidence({ val: sop.number, conf: sop.confidence, rule: sop.rule, reason: sop.reason });
+
+    signals.push({
+        name: 'COMBINATION',
+        number: filteredAndroid.val,
+        small: sig.casilla5,
+        big: sig.casilla14,
+        confidence: androidConf,
+        reason: filteredAndroid.reason,
+        rule: filteredAndroid.rule,
+        mode: androidMode,
+        targetZone: androidTargetZone
+    });
+
+    signals.push({
+        ...sop,
+        number: filteredSoporte.val,
+        reason: filteredSoporte.reason,
+        rule: filteredSoporte.rule
     });
 
     return signals;

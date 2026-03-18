@@ -45,7 +45,8 @@ function getPhysics(prev, current) {
 // Agent 5: Similarity Search
 // Looks for historical instances where the exact same sequence of the last N physical parameters occurred.
 async function predictAgent5(tableId, currentHistoryNumbers) {
-    if (currentHistoryNumbers.length < 3) return null;
+    // CRITICAL: We need at least 50 spins to have a statistically relevant base for similarity search
+    if (currentHistoryNumbers.length < 50) return null;
     
     // We base our search on the last 3 spin numbers
     const seq = currentHistoryNumbers.slice(-3);
