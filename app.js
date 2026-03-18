@@ -129,12 +129,46 @@ function renderSignalsPanel(signals) {
 async function submitNumber(val, silent = false, batch = false) {
     let n = parseInt(val || numInput.value);
     if (isNaN(n) || n < 0 || n > 36) return;
+    
+    // Always push to history, even if silent (history reload)
+    history.push(n);
+
     if (!silent) {
-        history.push(n);
-        try { const resp = await apiPostSpin(currentTableId, n); if (resp.predictions) latestAgent5Top = resp.predictions.agent5_top; } catch(e){}
+        try { 
+            const resp = await apiPostSpin(currentTableId, n); 
+            if (resp && resp.predictions && resp.predictions.agent5_top !== undefined) {
+                latestAgent5Top = resp.predictions.agent5_top;
+            }
+        } catch(e) { console.error("Error posting spin:", e); }
     }
-    const sig = computeDealerSignature(history), res = analyzeSpin(history, stats), prx = projectNextRound(history, stats), sigs = getIAMasterSignals(prx, sig, history) || [];
-    sigs.push({ name: 'Célula', number: latestAgent5Top });
+
+    // 1. Evaluar señales anteriores (Solo si no es carga inicial masiva o si es el último del batch)
+    if (!batch) {
+        lastIaSignals.forEach((s, idx) => {
+            if (!s || s.confidence === '0%' || s.rule === 'STOP') return;
+            let win = false;
+            if (s.betZone && s.betZone.length > 0) win = s.betZone.includes(n);
+            else if (s.number !== null && s.number !== undefined) win = wheelDistance(n, s.number) <= (idx === 2 ? 4 : 9);
+            
+            if (win) iaWins[idx]++; else iaLosses[idx]++;
+            iaSignalsHistory[idx].push(win ? 'win' : 'loss');
+            if (activeIaTab === idx) { if (win) recommendedWin++; else recommendedLoss++; }
+        });
+    }
+
+    const sig = computeDealerSignature(history);
+    const res = analyzeSpin(history, stats);
+    const prx = projectNextRound(history, stats);
+    const sigs = getIAMasterSignals(prx, sig, history) || [];
+    
+    // Agent 5 (Célula)
+    sigs.push({ 
+        name: 'Célula', 
+        number: latestAgent5Top,
+        confidence: latestAgent5Top !== null ? 'MAX' : '0%',
+        reason: latestAgent5Top !== null ? 'HISTÓRICO' : (history.length < 50 ? `GRABANDO ${history.length}/50` : 'ANALIZANDO...')
+    });
+    
     lastIaSignals = sigs;
     if (!batch) {
         renderHistory(); drawWheel(n); buildStratTabs(res); renderTargetPanel(res); renderNextPanel(prx); renderTravelPanel(sig); renderSignalsPanel(sigs);
