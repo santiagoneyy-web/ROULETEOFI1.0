@@ -9,7 +9,7 @@
 </head>
 <body>
 
-<div class="pro-dashboard">
+<div class="pro-dashboard app-layout">
     <!-- ════════ SIDEBAR (Vertical Nav) ════════ -->
     <aside class="sidebar">
         <div class="brand">
@@ -38,7 +38,15 @@
         </header>
 
         <div class="dashboard-content">
-            <!-- TRAVEL DATA (Now Primary) -->
+            <!-- AGENT TABS (Unified Header) -->
+            <div class="ia-tabs-strip-pro" id="strat-tabs"></div>
+
+            <!-- ACTIVE SIGNAL AREA (High Impact) -->
+            <div id="active-signal-container" class="signal-banner-pro">
+                <div class="signal-idle">⚡ WAITING FOR SPIN DATA...</div>
+            </div>
+
+            <!-- TRAVEL DATA (Primary) -->
             <section class="panel travel-panel-pro">
                 <div class="panel-header" style="padding:10px 15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
                     <span style="font-size:0.75rem; letter-spacing:1px; font-weight:700;">TRAVEL DATA - DETAILED SPIN HISTORY</span>
@@ -65,20 +73,21 @@
         </div>
     </main>
 
-    <!-- ════════ INPUT SIDEBAR (Right) ════════ -->
-    <aside class="input-panel">
+    <!-- ════════ VISUAL SIDEBAR (Right) ════════ -->
+    <aside class="input-panel" style="display:flex; flex-direction:column;">
         <div class="wheel-section" style="padding:20px; text-align:center; border-bottom:1px solid var(--border);">
             <canvas id="wheel-canvas" width="220" height="220"></canvas>
         </div>
-        <div class="manual-input" style="padding:20px;">
-            <div style="font-size:0.6rem; text-transform:uppercase; color:var(--text-dim); margin-bottom:8px;">Manual Entry</div>
-            <div style="display:flex; gap:5px;">
-                <input id="num-input" type="number" placeholder="#" style="width:60px; height:40px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:#fff; text-align:center; font-size:1.2rem; font-weight:700;" />
-                <button id="submit-btn" class="pro-btn btn-primary" style="flex:1; background:var(--accent); color:#fff; border:none; border-radius:8px; font-weight:700;">SUBMIT</button>
-                <button id="clear-btn" class="pro-btn btn-secondary" style="width:40px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--text-dim);">✕</button>
+        <div class="settings-drawer-pro" style="padding:20px;">
+            <div class="drawer-header" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleSettings()">
+                <div style="font-size:0.65rem; text-transform:uppercase; color:var(--text-dim); letter-spacing:1px;">Dashboard Settings</div>
+                <div id="settings-arrow" style="color:var(--gold); transition:transform 0.3s;">▼</div>
             </div>
-            <div id="status-msg" class="status-banner" style="margin-top:10px; font-size:0.65rem; color:var(--accent); text-align:center;">System Online</div>
+            <div id="settings-content" style="display:none; margin-top:15px; border-top:1px solid var(--border); padding-top:15px;">
+                <button id="clear-btn" class="pro-btn btn-danger" style="width:100%; padding:10px; font-size:0.7rem; border-radius:8px;">WIPE ALL DATA</button>
+            </div>
         </div>
+        <div id="status-msg" class="status-banner" style="margin-top:auto; padding:15px; font-size:0.65rem; color:var(--accent); text-align:center; opacity:0.5;">System Online</div>
     </aside>
 </div>
 

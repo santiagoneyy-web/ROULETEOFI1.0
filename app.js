@@ -13,17 +13,9 @@ let activeIaTab    = 0;
 const API_BASE = '/api';
 let currentTableId = null;
 
-const numInput    = document.getElementById('num-input');
-const submitBtn   = document.getElementById('submit-btn');
-const clearBtn    = document.getElementById('clear-btn');
-const historyEl   = document.getElementById('history-strip');
-const topPanel    = document.getElementById('top-content');
-const travelPanel = document.getElementById('travel-content');
-const tableSelect      = document.getElementById('table-select');
-
 // Pro v3.1 Selectors
-const sidebarNav = document.getElementById('strat-tabs');
 const activeAgentLabel = document.getElementById('active-agent-name');
+const numInput = { value: '', focus: () => {} }; // Dummy as manual entry is gone
 
 const wheelCanvas = document.getElementById('wheel-canvas');
 const wheelCtx = wheelCanvas ? wheelCanvas.getContext('2d') : null;
@@ -104,10 +96,9 @@ function updateClock() {
 setInterval(updateClock, 1000);
 
 function renderSignalsPanel(signals) {
-    const grid = document.getElementById('top-content');
+    const banner = document.getElementById('active-signal-container');
     const tabStrip = document.getElementById('strat-tabs');
-    const activeLabel = document.getElementById('active-agent-name');
-    if (!grid || !tabStrip) return;
+    if (!banner || !tabStrip) return;
 
     try {
         const names = ['N17', 'N16', 'N17PLUS', 'N18', 'CELULA'];
@@ -131,50 +122,28 @@ function renderSignalsPanel(signals) {
             </button>`;
         }).join('');
 
-        if (activeLabel) activeAgentLabel.innerText = names[activeIaTab];
+        if (activeAgentLabel) activeAgentLabel.innerText = names[activeIaTab];
 
         const s = signals[activeIaTab];
         if (!s || !s.top) {
-            grid.innerHTML = '<div class="agent-card-pro" style="text-align:center; padding:20px;"><p class="muted">IA ANALYZING...</p></div>';
+            banner.className = 'signal-banner-pro';
+            banner.innerHTML = '<div class="signal-idle">⚡ WAITING FOR SPIN DATA...</div>';
             return;
         }
 
-        const h15 = (iaSignalsHistory[activeIaTab] || []).slice(-15);
-        const w15 = h15.filter(x => x === 'win').length;
-        const hit15 = h15.length > 0 ? Math.round((w15 / h15.length) * 100) : 0;
-        const patternStrip = h15.map(x => x === 'win' ? '<span style="color:var(--green); font-weight:900;">W</span>' : '<span style="color:var(--red); opacity:0.6;">L</span>').join('');
+        const isHighConfidence = s.confidence && parseInt(s.confidence) > 50;
+        banner.className = `signal-banner-pro ${isHighConfidence ? 'signal-pulse-green' : ''}`;
 
-        grid.innerHTML = `
-        <div class="agent-card-pro">
-            <div class="card-header-pro">
-                <span class="card-title-pro">${names[activeIaTab]} ANALYSIS</span>
-                <div style="text-align:right;">
-                    <div class="hit-rate-major">${hit15}% <small>HIT RATE</small></div>
-                    <div class="hit-rate-pattern">${patternStrip}</div>
+        banner.innerHTML = `
+            <div class="signal-active-box">
+                <div class="signal-target-num">${s.top} <sup style="font-size:0.8rem; opacity:0.6;">n9</sup></div>
+                <div class="signal-label-pro">RECOMMENDED PLAY</div>
+                <div style="font-family:var(--mono); font-size:0.7rem; color:var(--text-dim); margin-top:8px;">
+                    CONFIDENCE: <span style="color:var(--green);">${s.confidence || '33%'}</span> | 
+                    ZONE: ${s.small}-${s.big}
                 </div>
-            </div>
-            
-            <div class="target-pocket-pro">
-                <div class="target-num-pro">${s.top} <span style="font-size:0.6rem; vertical-align:middle; opacity:0.6;">n9</span></div>
-                <div class="target-label-pro">TARGETED POCKET</div>
-            </div>
-
-            <div class="card-footer-pro">
-                <div class="metric-box-pro">
-                    <span class="metric-val-pro">${s.small || '--'} <span style="font-size:0.5rem; opacity:0.5;">n4</span></span>
-                    <span class="metric-lbl-pro">SMALL</span>
-                </div>
-                <div class="metric-box-pro" style="border-color:var(--gold-glow); background:rgba(245,200,66,0.05);">
-                    <span class="metric-val-pro" style="color:var(--gold);">${s.top} <span style="font-size:0.5rem; opacity:0.5;">n9</span></span>
-                    <span class="metric-lbl-pro">TOP</span>
-                </div>
-                <div class="metric-box-pro">
-                    <span class="metric-val-pro">${s.big || '--'} <span style="font-size:0.5rem; opacity:0.5;">n4</span></span>
-                    <span class="metric-lbl-pro">BIG</span>
-                </div>
-            </div>
-        </div>`;
-    } catch (e) { console.error("Pro Render Error:", e); }
+            </div>`;
+    } catch (e) { console.error("Pro Signal Render Error:", e); }
 }
 
 function renderTravelPanel(sig) {
@@ -278,9 +247,21 @@ function wipeData() {
 }
 
 window.setActiveIaTab = (idx) => { activeIaTab = idx; submitNumber(null, true, false); };
-submitBtn.addEventListener('click', () => submitNumber());
-numInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitNumber(); });
-clearBtn.addEventListener('click', wipeData);
+
+window.toggleSettings = () => {
+    const content = document.getElementById('settings-content');
+    const arrow = document.getElementById('settings-arrow');
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.style.transform = 'rotate(180deg)';
+    } else {
+        content.style.display = 'none';
+        arrow.style.transform = 'rotate(0deg)';
+    }
+};
+
+const clearBtn = document.getElementById('clear-btn');
+if (clearBtn) clearBtn.addEventListener('click', wipeData);
 
 tableSelect.addEventListener('change', async () => {
     currentTableId = tableSelect.value; if (!currentTableId) return;

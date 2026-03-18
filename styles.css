@@ -31,9 +31,9 @@ body {
 }
 
 /* ════════ LAYOUT ════════ */
-.pro-d.app-layout {
+.app-layout {
     display: grid;
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: 240px 1fr 280px;
     height: 100vh;
     overflow: hidden;
 }
@@ -192,136 +192,100 @@ body {
 .val-up      { color: var(--green); }
 .val-down    { color: var(--red); }
 .val-neutral { color: var(--text); }
-/* ── Hit Rate Patterns ───────────────────────────────────── */
-.hit-rate-pattern {
-    font-family: var(--mono);
-    font-size: 0.65rem;
-    margin-top: 2px;
-    letter-spacing: 1px;
+/* ── IA Tabs Strip (Elite Version) ────────────────────────── */
+.ia-tabs-strip-pro {
     display: flex;
-    justify-content: flex-end;
-    gap: 2px;
-}
-.hit-rate-pattern span { min-width: 8px; text-align: center; }
-
-/* ── Pro Prediction Cards ──────────────────────────────────── */
-.prediction-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 20px;
-    padding: 0 30px 30px;
+    gap: 12px;
+    padding: 0 30px;
+    margin-bottom: 20px;
 }
 
-.agent-card-pro {
-    background: var(--surface);
+.ia-tabs-strip-pro .nav-item {
+    background: rgba(15, 23, 62, 0.4);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 12px 20px;
-    position: relative;
-    overflow: hidden;
-    backdrop-filter: blur(20px);
-}
-
-.card-header-pro {
+    padding: 15px 20px;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: center;
-    margin-bottom: 2px;
+    gap: 4px;
+    min-width: 140px;
+    transition: all 0.3s ease;
 }
 
-.card-title-pro {
+.ia-tabs-strip-pro .nav-item.active {
+    background: rgba(76, 130, 255, 0.15);
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(76, 130, 255, 0.1);
+}
+
+.ia-tabs-strip-pro .nav-item span:first-child {
+    font-size: 1.1rem;
     font-weight: 900;
-    font-size: 0.72rem;
     letter-spacing: 1px;
-    color: var(--text-dim);
+    color: #fff;
 }
 
-.target-pocket-pro {
+/* ── Active Signal Banner ─────────────────────────────────── */
+.signal-banner-pro {
+    margin: 0 30px 25px;
+    background: rgba(4, 8, 24, 0.6);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    min-height: 100px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 15px;
-    padding: 5px 12px;
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 10px;
-    margin: 4px 0;
-    border: 1px solid rgba(255, 255, 255, 0.03);
+    overflow: hidden;
+    position: relative;
+    backdrop-filter: blur(20px);
 }
 
-.target-num-pro {
-    font-size: 2.2rem;
+.signal-active-box {
+    text-align: center;
+    animation: slideInUp 0.4s ease-out;
+}
+
+@keyframes slideInUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.signal-pulse-green {
+    border-color: var(--green) !important;
+    box-shadow: 0 0 30px rgba(0, 255, 162, 0.2);
+    animation: signalVibrate 0.5s infinite linear;
+}
+
+@keyframes signalVibrate {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+.signal-target-num {
+    font-size: 3.5rem;
     font-weight: 900;
     color: var(--gold);
     line-height: 1;
     font-family: var(--mono);
+    text-shadow: 0 0 40px var(--gold-glow);
 }
 
-.target-label-pro {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 2px;
+.signal-label-pro {
+    font-size: 0.8rem;
     color: var(--text-dim);
-    text-transform: uppercase;
-    margin-top: 5px;
-}
-
-.card-footer-pro {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-}
-
-.metric-box-pro {
-    background: rgba(4, 8, 24, 0.4);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.metric-val-pro {
-    font-family: var(--mono);
-    font-size: 0.95rem;
     font-weight: 800;
-    color: #fff;
-}
-
-.metric-lbl-pro {
-    font-size: 0.55rem;
-    font-weight: 700;
-    color: var(--text-dim);
+    letter-spacing: 4px;
+    margin-top: 5px;
     text-transform: uppercase;
 }
 
-/* ── UI Cleanup Customizations ────────────────────────────── */
 .dashboard-content {
     flex: 1;
     overflow-y: auto;
-    padding-top: 20px;
-}
-
-.ia-tabs-strip {
-    display: flex;
-    gap: 8px;
-    padding: 0 30px;
-    margin-bottom: 25px;
-    overflow-x: auto;
-}
-
-.ia-tabs-strip .nav-item {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid var(--border);
-    font-size: 0.75rem;
-    padding: 8px 16px;
-    white-space: nowrap;
-}
-
-.ia-tabs-strip .nav-item.active {
-    background: rgba(76, 130, 255, 0.1);
-    border-color: var(--accent);
-    color: var(--accent);
+    padding: 20px 0;
 }
 
 .status-pill {
