@@ -237,10 +237,10 @@ app.get('/api/predict/:tableId', async (req, res) => {
         
         let predictions = { agent1_top: null, agent2_top: null, agent3_top: null, agent4_top: null, agent5_top: null };
         if (masterSignals && masterSignals.length > 0) {
-            const ag1 = masterSignals.find(s => s.name === 'FISICA STUDIO');
-            const ag2 = masterSignals.find(s => s.name === 'SIX STRATEGIE');
-            const ag3 = masterSignals.find(s => s.name === 'COMBINATION');
-            const ag4 = masterSignals.find(s => s.name === 'SOPORTE PRO');
+            const ag1 = masterSignals.find(s => s.name === 'Android n17');
+            const ag2 = masterSignals.find(s => s.name === 'Android n16');
+            const ag3 = masterSignals.find(s => s.name === 'Android 1717');
+            const ag4 = masterSignals.find(s => s.name === 'N18');
             if (ag1) predictions.agent1_top = ag1.number;
             if (ag2 && ag2.tp !== undefined) predictions.agent2_top = ag2.tp;
             if (ag3) predictions.agent3_top = ag3.number;

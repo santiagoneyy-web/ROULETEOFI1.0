@@ -1,15 +1,12 @@
 // ============================================================
-// app.js — UI logic for Roulette Predictor v2
+// app.js — UI logic for Roulette Predictor v2 [VER 2.0.1]
 // ============================================================
 
 const history      = [];
 const stats        = {};
 const iaSignalsHistory = [ [], [], [], [], [] ]; 
-const lastIaHits = [null, null, null, null, null];
 const iaWins = [0, 0, 0, 0, 0];
 const iaLosses = [0, 0, 0, 0, 0];
-let recommendedWin = 0;
-let recommendedLoss = 0;
 let lastIaSignals = [null, null, null, null, null]; 
 let activeIaTab    = 0; 
 let latestAgent5Top = null; 
@@ -18,22 +15,16 @@ let activeTab      = '-';
 
 const API_BASE = '/api';
 let currentTableId = null;
-let pollingTimer   = null;
-let lastKnownSpinId = null;
-
-const auditStats = { 'N9': { w: 0, l: 0 }, 'N4_S': { w: 0, l: 0 }, 'N4_B': { w: 0, l: 0 } };
 
 const numInput    = document.getElementById('num-input');
 const submitBtn   = document.getElementById('submit-btn');
 const clearBtn    = document.getElementById('clear-btn');
 const historyEl   = document.getElementById('history-strip');
-const statusMsg   = document.getElementById('status-msg');
 const stratTabs   = document.getElementById('strat-tabs');
 const targetPanel = document.getElementById('target-content');
 const nextPanel   = document.getElementById('next-content');
 const topPanel    = document.getElementById('top-content');
 const travelPanel = document.getElementById('travel-content');
-
 const tableSelect      = document.getElementById('table-select');
 const tableSpinCount   = document.getElementById('table-spin-count');
 
@@ -71,7 +62,9 @@ function drawWheel(highlightNum = null) {
     });
     ctx.beginPath(); ctx.arc(cx, cy, innerR, 0, 2*Math.PI); ctx.fillStyle = '#070c2a'; ctx.fill();
 }
+
 function renderHistory() {
+    if (!historyEl) return;
     historyEl.innerHTML = '';
     history.slice(-15).reverse().forEach((n, idx) => {
         const div = document.createElement('div');
@@ -131,7 +124,7 @@ function renderTravelPanel(sig) {
     for (let i = 0; i < Math.min(history.length, maxEntries); i++) {
         const idx = history.length - 1 - i;
         const n = history[idx];
-        const t = hist[idx - 1]; // travel associated with getting to this number
+        const t = hist[idx - 1]; 
         const dist = t !== undefined ? Math.abs(t) : '-';
         const dir = t !== undefined ? (t > 0 ? 'DER. ↻' : (t < 0 ? 'IZQ. ↺' : '-')) : '-';
         const phase = dist === '-' ? '-' : (dist <= 9 ? 'SMALL' : 'BIG');
@@ -152,8 +145,8 @@ function renderTravelPanel(sig) {
             <div class="last-hit-badge">LAST: ${sig.recommendedPlay}</div>
         </div>
         <div class="travel-scroll-container">
-            <table class="travel-table">
-                <thead><tr><th>N°</th><th>DIST</th><th>DIR</th><th>PHASE</th></tr></thead>
+            <table class="travel-table" style="width:100%; font-size:0.75rem; border-collapse:collapse;">
+                <thead><tr style="border-bottom:1px solid var(--border); color:var(--text-dim);"><th>N°</th><th>DIST</th><th>DIR</th><th>PHASE</th></tr></thead>
                 <tbody>${rows.join('')}</tbody>
             </table>
         </div>`;
@@ -175,12 +168,12 @@ function renderSignalsPanel(signals) {
 
         if (s) {
             const isPerfect = (s.name === 'IA' && s.confidence === 'PERFECTION');
-            const slotClass = s.mode === 'FISICA' ? 'slot-escudo' : (s.mode === 'ATAQUE' ? 'slot-lanza' : (s.mode === 'MATH' ? 'slot-math' : ''));
+            const slotClass = s.mode === 'FISICA' ? 'slot-escudo' : (s.mode === 'ATAQUE' ? 'slot-lanza' : (s.mode === 'MATH' ? 'slot-math' : (s.mode === 'SOPORTE' ? 'slot-lanza' : '')));
             
             if (activeIaTab === 0) { // FISICA STUDIO
                 content = `<div class="ia-active-slot slot-escudo">
                     <div class="ia-slot-header"><span class="ia-slot-name">🎯 FÍSICA STUDIO</span><span class="ia-slot-conf">${s.confidence || '0%'} CONF.</span></div>
-                    <div class="ia-grid" style="display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 10px; align-items: center;">
+                    <div class="ia-grid" style="display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 10px; align-items: center; margin: 15px 0;">
                         <div class="ia-side-box" style="background:rgba(255,255,255,0.03); border-radius:10px; padding:10px; text-align:center;">
                             <div class="ia-side-lbl" style="font-size:0.6rem; color:var(--text-dim); margin-bottom:5px;">SMALL</div>
                             <div class="ia-side-num" style="font-size:1.4rem; font-weight:800; color:#fff;">${s.small || '0'}<sup>n4</sup></div>
@@ -194,20 +187,20 @@ function renderSignalsPanel(signals) {
                             <div class="ia-side-num" style="font-size:1.4rem; font-weight:800; color:#fff;">${s.big || '0'}<sup>n4</sup></div>
                         </div>
                     </div>
-                    <div class="ia-slot-footer" style="display:flex; justify-content:space-between; font-size:0.65rem; border-top:1px solid var(--border); padding-top:10px; margin-top:15px;">
-                        <div class="ia-reason" style="color:var(--text-dim);">RUPTURA DETECTADA - POLO ${s.mode || 'MATH'}</div>
+                    <div class="ia-slot-footer" style="display:flex; justify-content:space-between; font-size:0.65rem; border-top:1px solid var(--border); padding-top:10px;">
+                        <div class="ia-reason" style="color:var(--text-dim);">RUPTURA DETECTADA - POLO MATH</div>
                         <div class="ia-reason" style="color:var(--gold);">SOPORTE BIG N9</div>
                     </div>
                 </div>`;
             } else { // OTHER AGENTS & IA AUTÓNOMA
                 content = `<div class="ia-active-slot ${slotClass} ${isPerfect ? 'slot-perfect' : ''}" style="min-height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
                     <div class="ia-slot-header">
-                        <span class="ia-slot-name">${activeIaTab === 4 ? '🤖 IA AUTÓNOMA' : s.name}</span>
+                        <span class="ia-slot-name">${activeIaTab === 4 ? '🤖 IA AUTÓNOMA' : (s.name || 'AGENTE')}</span>
                         <span class="ia-slot-conf" style="color:var(--green); font-weight:700;">${s.confidence || '0%'}</span>
                     </div>
                     <div class="ia-center-box" style="text-align:center; padding: 10px 0;">
                         <div class="ia-rule-pro" style="color:var(--gold); font-size:0.8rem; letter-spacing:2px; text-transform:uppercase;">${s.rule || 'ANALIZANDO'}</div>
-                        <div class="ia-main-num" style="font-size:3.2rem; font-weight:900; color:#fff; line-height:1; margin:10px 0;">${s.number !== null ? s.number : (s.tp || '...')}</div>
+                        <div class="ia-main-num" style="font-size:3.2rem; font-weight:900; color:#fff; line-height:1; margin:10px 0;">${s.number !== null && s.number !== undefined ? s.number : (s.tp || '...')}</div>
                         <div class="ia-dir-lbl" style="font-size:0.65rem; color:var(--text-dim);">SINCRONIZANDO BDD...</div>
                     </div>
                     <div class="ia-slot-footer" style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:10px;">
@@ -218,18 +211,17 @@ function renderSignalsPanel(signals) {
             }
         }
         const dots = (iaSignalsHistory[activeIaTab] || []).slice(-10).map(h => `<span class="m-hist-badge ${h === 'win' ? 'm-hist-w' : 'm-hist-l'}">${h === 'win' ? 'W' : 'L'}</span>`).join('');
-        topPanel.innerHTML = `<div class="ia-tabs-strip">${tabButtons}</div>${content}<div class="ia-pattern-strip">${dots}</div>`;
+        topPanel.innerHTML = `<div class="ia-tabs-strip" style="display:flex; gap:5px; margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:5px;">${tabButtons}</div>${content}<div class="ia-pattern-strip" style="display:flex; gap:4px; margin-top:15px; justify-content:center;">${dots}</div>`;
     } catch (e) { console.error(e); }
 }
 
 async function submitNumber(val, silent = false, batch = false) {
     let n = parseInt(val || numInput.value);
     
-    // 1. DATA PROCESSING (Only if a valid number is provided)
     if (!isNaN(n) && n >= 0 && n <= 36) {
         history.push(n);
 
-        if (!silent) {
+        if (!silent && currentTableId) {
             try { 
                 const resp = await apiPostSpin(currentTableId, n); 
                 if (resp && resp.predictions) {
@@ -239,12 +231,10 @@ async function submitNumber(val, silent = false, batch = false) {
             } catch(e) { console.error("Error posting spin:", e); }
         }
 
-        // Evaluate previous signals against this new number
         lastIaSignals.forEach((s, idx) => {
             if (!s || s.confidence === '0%' || s.rule === 'STOP' || s.rule === 'PAUSA (BAJA CONF.)') return;
             let win = false;
             
-            // Evaluation logic based on agent type
             if (s.betZone && s.betZone.length > 0) {
                 win = s.betZone.includes(n);
             } else if (s.number !== null && s.number !== undefined) {
@@ -258,20 +248,15 @@ async function submitNumber(val, silent = false, batch = false) {
         });
     }
 
-    // 2. LOGIC EVALUATION (Generate predictions for the NEXT spin)
-    if (typeof computeDealerSignature === 'undefined' || typeof analyzeSpin === 'undefined') {
-        console.error("❌ Critical: predictor.js logic not loaded.");
-        return;
-    }
+    if (typeof computeDealerSignature !== 'function') return;
 
     const sig = computeDealerSignature(history);
     const res = analyzeSpin(history, stats);
     const prx = projectNextRound(history, stats);
     const sigs = getIAMasterSignals(prx, sig, history) || [];
     
-    // Ensure sigs match the names array: ['FISICA', 'SIX', 'COMBINATION', 'SOPORTE', 'IA']
     const finalSigs = [
-        { ...sigs[1], name: 'FISICA', mode: 'FISICA', small: sig.casilla5, big: sig.casilla14 }, // FISICA tab
+        { ...sigs[1], name: 'FISICA', mode: 'FISICA', small: sig.casilla5, big: sig.casilla14 },
         { ...sigs[0], name: 'SIX', mode: 'MATH' },
         { ...sigs[2], name: 'COMBINATION', mode: 'ATAQUE' },
         { ...sigs[3], name: 'SOPORTE', mode: 'SOPORTE' },
@@ -287,7 +272,6 @@ async function submitNumber(val, silent = false, batch = false) {
     
     lastIaSignals = finalSigs;
 
-    // 3. UI RENDERING (Skip if batching for performance)
     if (!batch) {
         renderHistory(); 
         drawWheel(isNaN(n) ? null : n); 
@@ -324,14 +308,10 @@ tableSelect.addEventListener('change', async () => {
     currentTableId = tableSelect.value; if (!currentTableId) return;
     const spins = await apiFetchHistory(currentTableId); 
     wipeData(); 
-    
-    // Ingest history objects {number}
     for (const s of spins) {
         if (s && s.number !== undefined) await submitNumber(s.number, true, true);
     }
     if (tableSpinCount) tableSpinCount.textContent = `(${spins.length})`;
-    
-    // Sync latest prediction
     try {
         const p = await apiFetchPredict(currentTableId);
         if (p) {
@@ -339,7 +319,6 @@ tableSelect.addEventListener('change', async () => {
             latestAgent5Dna = p.agent5_dna || false;
         }
     } catch(e) { console.error("Sync error:", e); }
-
     submitNumber(null, true, false);
 });
 
@@ -347,4 +326,9 @@ async function loadTables() {
     const ts = await apiFetchTables(); 
     if (tableSelect) tableSelect.innerHTML = '<option value="">-- Mesa --</option>' + ts.map(t => `<option value="${t.id}">${t.name}</option>`).join(''); 
 }
-document.addEventListener('DOMContentLoaded', () => { loadTables(); drawWheel(null); });
+
+document.addEventListener('DOMContentLoaded', () => { 
+    console.log("🚀 [App] Version 2.0.1 Loaded Successfully.");
+    loadTables(); 
+    drawWheel(null); 
+});
