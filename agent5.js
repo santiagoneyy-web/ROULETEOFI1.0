@@ -75,35 +75,29 @@ async function predictAgent5(tableId, currentHistoryNumbers, otherAgentsDNA = []
         const currentPhys = [];
         for (let i = currentHistoryNumbers.length - 3; i < currentHistoryNumbers.length - 1; i++) {
             currentPhys.push(getPhysics(currentHistoryNumbers[i], currentHistoryNumbers[i+1]));
-        }
-
-        // --- 1. EXTRACT EXPERT DNA (Proactive Influence) ---
-        let dnaPower = {}; // Points for numbers suggested by other elite agents
+        }        // --- 1. TACTICAL DNA INGESTION (Expert Inputs) ---
+        let combinedIntelligence = {}; // Weighted selection pool
+        
+        // Célula STUDIES his teammates' logic
         otherAgentsDNA.forEach(ag => {
+            const weight = (ag.confidence && ag.confidence.includes('%')) ? parseInt(ag.confidence)/100 : 0.8;
             if (ag.number !== null && ag.number !== undefined) {
-                dnaPower[ag.number] = (dnaPower[ag.number] || 0) + 3; // Direct number: High DNA Weight
-                
-                // Neighbor boost (N1 range on wheel)
+                combinedIntelligence[ag.number] = (combinedIntelligence[ag.number] || 0) + (5 * weight);
+                // Neighbor Influence (Célula anticipates shifts)
                 const i = WHEEL_INDEX[ag.number];
                 [WHEEL_ORDER[(i+36)%37], WHEEL_ORDER[(i+1)%37]].forEach(n => {
-                    dnaPower[n] = (dnaPower[n] || 0) + 1;
+                    combinedIntelligence[n] = (combinedIntelligence[n] || 0) + (1.5 * weight);
                 });
             }
-            if (ag.tp !== null && ag.tp !== undefined) dnaPower[ag.tp] = (dnaPower[ag.tp] || 0) + 2;
-            if (Array.isArray(ag.cor)) ag.cor.forEach(n => dnaPower[n] = (dnaPower[n] || 0) + 1);
-            if (ag.small !== undefined) dnaPower[ag.small] = (dnaPower[ag.small] || 0) + 1;
-            if (ag.big !== undefined) dnaPower[ag.big] = (dnaPower[ag.big] || 0) + 1;
+            if (ag.tp !== null && ag.tp !== undefined) combinedIntelligence[ag.tp] = (combinedIntelligence[ag.tp] || 0) + (3 * weight);
+            if (Array.isArray(ag.cor)) ag.cor.forEach(n => combinedIntelligence[n] = (combinedIntelligence[n] || 0) + (1 * weight));
         });
 
-        let nextNumberFrequencies = {};
-        let matches = 0;
-        
-        // --- 1. DEEP PATTERN MATCHING (Numbers + Physics) ---
+        // --- 2. DEEP HISTORICAL MEMORY (Physics & Numbers) ---
+        let memoryMatches = {};
+        let totalMatches = 0;
         for (let i = 0; i < nums.length - 3; i++) {
-            // Check Number Sequence (3 spins)
             const numMatch = (nums[i] === seq[0] && nums[i+1] === seq[1] && nums[i+2] === seq[2]);
-            
-            // Check Physics Sequence (Last 2 transitions)
             const p1 = getPhysics(nums[i], nums[i+1]);
             const p2 = getPhysics(nums[i+1], nums[i+2]);
             const physMatch = (p1.distance === currentPhys[0].distance && p1.direction === currentPhys[0].direction &&
@@ -111,84 +105,55 @@ async function predictAgent5(tableId, currentHistoryNumbers, otherAgentsDNA = []
 
             if (numMatch || physMatch) {
                 const nextNum = nums[i+3];
-                if (!nextNumberFrequencies[nextNum]) nextNumberFrequencies[nextNum] = 0;
-                
-                // Weight: Number match is strong, Physics match is subtle, Both is "Perfect"
-                let weight = 0;
-                if (numMatch) weight += 2;
-                if (physMatch) weight += 1;
-                
-                nextNumberFrequencies[nextNum] += weight;
-                matches++;
+                memoryMatches[nextNum] = (memoryMatches[nextNum] || 0) + (numMatch ? 4 : 2);
+                totalMatches++;
             }
         }
         
-        // --- 2. FALLBACK 1 (2-Number Sequence) ---
-        if (matches === 0) {
-            for (let i = 0; i < nums.length - 2; i++) {
-                if (nums[i] === seq[1] && nums[i+1] === seq[2]) {
-                    const nextNum = nums[i+2];
-                    if (!nextNumberFrequencies[nextNum]) nextNumberFrequencies[nextNum] = 0;
-                    nextNumberFrequencies[nextNum]++;
-                    matches++;
-                }
-            }
-        }
-        
-        // --- 3. FALLBACK 2 (Last Number Only) ---
-        if (matches === 0) {
+        // --- 3. AUTONOMOUS SYNTHESIS (Choosing the Perfect Path) ---
+        // If memory is empty, fallback to 2-seq then 1-seq
+        if (totalMatches === 0) {
             for (let i = 0; i < nums.length - 1; i++) {
                 if (nums[i] === seq[2]) {
-                    const nextNum = nums[i+1];
-                    if (!nextNumberFrequencies[nextNum]) nextNumberFrequencies[nextNum] = 0;
-                    nextNumberFrequencies[nextNum]++;
-                    matches++;
+                    const n = nums[i+1];
+                    memoryMatches[n] = (memoryMatches[n] || 0) + 1;
+                    totalMatches++;
                 }
             }
         }
 
-        // If still no matches, foolproof fallback: Global Frequencies for this table
-        if (matches === 0) {
-            console.log(`⚠️ [Célula] No sequence matches. Falling back to global table frequencies.`);
-            for (let i = 0; i < nums.length; i++) {
-                const n = nums[i];
-                if (!nextNumberFrequencies[n]) nextNumberFrequencies[n] = 0;
-                nextNumberFrequencies[n]++;
-                matches++;
+        // FUSE Intelligence Layers
+        // Célula takes his memory score and FUSES it with the Tactical DNA
+        Object.keys(combinedIntelligence).forEach(n => {
+            if (memoryMatches[n]) {
+                memoryMatches[n] += combinedIntelligence[n] * 1.5; // SYNERGY BOOST
+            } else {
+                memoryMatches[n] = combinedIntelligence[n] * 0.7; // DNA INFLUENCE
             }
-        }
+        });
 
-        // If even global fails (empty table?), return null
-        if (matches === 0) {
-            console.log(`❌ [Célula] Critical: No history found for table ${tableId}.`);
-            return null;
-        }
-        
-        // --- 4. DATA FUSION (Combine Patterns + DNA Power) ---
-        if (matches > 0 || Object.keys(dnaPower).length > 0) {
-            Object.keys(dnaPower).forEach(n => {
-                if (nextNumberFrequencies[n] !== undefined) {
-                    nextNumberFrequencies[n] += dnaPower[n]; // Synergetic power!
-                } else {
-                    nextNumberFrequencies[n] = dnaPower[n] * 0.5; // DNA influence
-                }
-            });
-        }
-        
+        // Final Selection
         let topNum = null;
         let maxScore = 0;
-        for (const [numStr, score] of Object.entries(nextNumberFrequencies)) {
+        const allCandidates = memoryMatches;
+        
+        for (const [numStr, score] of Object.entries(allCandidates)) {
             if (score > maxScore) {
                 maxScore = score;
                 topNum = parseInt(numStr);
             }
         }
-        
-        // Final Synergy Check for UI
+
+        // PERFECT DNA Check
         let dnaMatchFound = false;
-        if (topNum !== null && otherAgentsDNA.some(a => a.number === topNum || a.tp === topNum)) {
-            console.log(`🧬 [Célula] Deep DNA Synergy: Prediction ${topNum} is backed by the team experts.`);
-            dnaMatchFound = true;
+        if (topNum !== null) {
+            const teamAgree = otherAgentsDNA.some(a => a.number === topNum || a.tp === topNum);
+            if (teamAgree && maxScore > 10) {
+                console.log(`🧬 [Célula] ABSOLUTE PERFECTION: Intelligence fused. Top: ${topNum}`);
+                dnaMatchFound = true;
+            }
+        }
+ue;
         }
 
         return { topNum, dnaMatch: dnaMatchFound };
