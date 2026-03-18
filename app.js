@@ -18,8 +18,7 @@ const activeAgentLabel = document.getElementById('active-agent-name');
 const historyEl       = document.getElementById('history-strip');
 const tableSelect     = document.getElementById('table-select');
 const travelTbody     = document.getElementById('travel-tbody');
-const topPanel        = document.getElementById('top-content'); 
-const signalBanner    = document.getElementById('active-signal-container');
+const topSignalEl     = document.getElementById('top-signal-val');
 
 const numInput = { value: '', focus: () => {}, addEventListener: () => {} }; 
 const submitBtn = { addEventListener: () => {} };
@@ -44,45 +43,60 @@ function calcDist(from, to) {
 function drawWheel(highlightNum = null) {
     if (!wheelCtx) return;
     const ctx = wheelCtx;
-    const cx = 110, cy = 110, r = 85;
+    const cx = 110, cy = 110;
     ctx.clearRect(0,0,220,220);
 
-    // Track
-    ctx.beginPath();
-    ctx.arc(cx, cy, r + 15, 0, Math.PI * 2);
-    ctx.strokeStyle = '#0a0d1a';
-    ctx.lineWidth = 12;
-    ctx.stroke();
+    // Outer Rim (Chrome effect)
+    const gr1 = ctx.createRadialGradient(cx, cy, 95, cx, cy, 105);
+    gr1.addColorStop(0, '#111');
+    gr1.addColorStop(0.5, '#444');
+    gr1.addColorStop(1, '#000');
+    ctx.beginPath(); ctx.arc(cx, cy, 100, 0, Math.PI*2);
+    ctx.strokeStyle = gr1; ctx.lineWidth = 10; ctx.stroke();
+
+    // Numbers track
+    ctx.beginPath(); ctx.arc(cx, cy, 80, 0, Math.PI*2);
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 30; ctx.stroke();
 
     WHEEL_NUMS.forEach((n, i) => {
         const ang = (i * (360 / 37) - 90) * (Math.PI / 180);
-        const x = cx + Math.cos(ang) * r;
-        const y = cy + Math.sin(ang) * r;
+        const x = cx + Math.cos(ang) * 80;
+        const y = cy + Math.sin(ang) * 80;
 
-        // Slot
+        // Pocket Background
         ctx.beginPath();
-        ctx.arc(x, y, 9, 0, Math.PI * 2);
-        ctx.fillStyle = (n === 0) ? '#00ff00' : (RED_NUMS.has(n) ? '#ff3b5c' : '#111');
+        ctx.arc(x, y, 12, 0, Math.PI * 2);
+        ctx.fillStyle = (n === 0) ? '#00b300' : (RED_NUMS.has(n) ? '#d61a3c' : '#000');
         ctx.fill();
-        
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1; ctx.stroke();
+
+        // Highlight
         if (n === highlightNum) {
-            ctx.beginPath();
-            ctx.arc(x, y, 12, 0, Math.PI * 2);
-            ctx.strokeStyle = '#f5c842';
-            ctx.lineWidth = 3;
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(x, y, 15, 0, Math.PI * 2);
+            ctx.strokeStyle = '#f5c842'; ctx.lineWidth = 3; ctx.stroke();
+            ctx.fillStyle = 'rgba(245,200,66,0.3)'; ctx.fill();
             
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
-            ctx.fill();
+            // Ball
+            const bx = cx + Math.cos(ang) * 98;
+            const by = cy + Math.sin(ang) * 98;
+            ctx.beginPath(); ctx.arc(bx, by, 6, 0, Math.PI*2);
+            ctx.fillStyle = '#fff'; ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+            ctx.fill(); ctx.shadowBlur = 0;
         }
 
+        // Real Numbers (Bigger & Clearer)
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 9px var(--mono)';
+        ctx.font = '900 11px var(--mono)';
         ctx.textAlign = 'center';
-        ctx.fillText(n, x, y + 3);
+        ctx.fillText(n, x, y + 4);
     });
+
+    // Center Spindle
+    ctx.beginPath(); ctx.arc(cx, cy, 30, 0, Math.PI*2);
+    ctx.fillStyle = '#111'; ctx.fill();
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#f5c842'; ctx.font = '800 8px var(--font)';
+    ctx.fillText("PRO V3.1", cx, cy + 3);
 }
 
 function renderHistory() {
@@ -241,11 +255,7 @@ async function submitNumber(val, silent = false, batch = false) {
         renderHistory(); 
         renderTravelPanel(null); 
         drawWheel(history[history.length - 1]);
-        
-        if (!silent) {
-            numInput.value = ''; 
-            numInput.focus();
-        }
+        renderSignalsPanel(lastIaSignals);
     }
 }
 
