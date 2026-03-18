@@ -121,8 +121,22 @@ function renderSignalsPanel(signals) {
     const smallBox = document.getElementById('pred-small-val');
     const bigBox = document.getElementById('pred-big-val');
     if (smallBox && bigBox && s && s.top) {
-        smallBox.style.opacity = (s.top <= 9) ? '1' : '0.3';
-        bigBox.style.opacity = (s.top >= 10 && s.top <= 18) ? '1' : '0.3';
+        if (s.top >= 1 && s.top <= 9) {
+            smallBox.innerText = s.top;
+            smallBox.style.opacity = '1';
+            bigBox.innerText = 'BIG';
+            bigBox.style.opacity = '0.3';
+        } else if (s.top >= 10 && s.top <= 19) {
+            bigBox.innerText = s.top;
+            bigBox.style.opacity = '1';
+            smallBox.innerText = 'SMALL';
+            smallBox.style.opacity = '0.3';
+        } else {
+            smallBox.innerText = 'SMALL';
+            bigBox.innerText = 'BIG';
+            smallBox.style.opacity = '0.3';
+            bigBox.style.opacity = '0.3';
+        }
     }
 }
 
@@ -139,10 +153,9 @@ function renderTravelPanel() {
         const dist = (prev !== undefined) ? calcDist(prev, n) : 0;
         const color = (n === 0) ? 'val-up' : (RED_NUMS.has(n) ? 'val-down' : '');
         
-        let phase = '---';
+        let phase = ''; // Remove ULTRA-BIG/Other labels
         if (n >= 1 && n <= 9) phase = 'SMALL';
-        else if (n >= 10 && n <= 18) phase = 'BIG';
-        else if (n > 18) phase = 'ULTRA-BIG';
+        else if (n >= 10 && n <= 19) phase = 'BIG';
 
         return `<tr>
             <td>${idx + 1}</td>

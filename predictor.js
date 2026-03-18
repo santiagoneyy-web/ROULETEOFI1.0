@@ -159,12 +159,12 @@ function getIAMasterSignals(prox, sig, history) {
     const signals = [];
 
     // Analyze Patterns
-    const isBigTrend = history.slice(-5).filter(n => n >= 10 && n <= 18).length >= 3;
+    const isBigTrend = history.slice(-5).filter(n => n >= 10 && n <= 19).length >= 3;
     const isSmallTrend = history.slice(-5).filter(n => n >= 1 && n <= 9).length >= 3;
     
     // Zig Zag Detectors
     const isDirZigZag = history.length >= 3 && Math.sign(calcDist(history[history.length-2], history[history.length-1])) !== Math.sign(calcDist(history[history.length-3], history[history.length-2]));
-    const isZoneZigZag = history.length >= 3 && (history[history.length-1] >= 10) !== (history[history.length-2] >= 10);
+    const isZoneZigZag = history.length >= 3 && (history[history.length-1] >= 10 && history[history.length-1] <= 19) !== (history[history.length-2] >= 10 && history[history.length-2] <= 19);
 
     // 1. Android n16 (Six Strategie - The User's Core Logic)
     const ssOutcomes = getSixStrategieSignals(lastNum);
