@@ -201,30 +201,35 @@ function renderTravelPanel() {
 
     // Pattern badge
     if (patEl) {
-        const last5 = history.slice(-5);
-        const bigCount   = last5.filter(n => n >= 10 && n <= 19).length;
-        const smallCount = last5.filter(n => n >= 1 && n <= 9).length;
-        const dirs = [];
-        for (let i = history.length - 4; i < history.length; i++) {
-            if (i > 0) dirs.push(calcDist(history[i-1], history[i]) > 0 ? 'D' : 'I');
+        if (typeof analyzeTableState === 'function' && history.length >= 5) {
+            const state = analyzeTableState(history);
+            let pat = 'ESTABLE', patClass = 'badge-stable';
+            
+            if (state.isDirZigZag || state.isZoneZigZag) { 
+                pat = 'ZIG ZAG ↔'; patClass = 'badge-zigzag'; 
+            } else if (state.isZoneTransition) { 
+                pat = 'TRANSICIÓN'; patClass = 'badge-zone'; 
+            } else if (state.isFalseBreak) {
+                pat = 'FALSA RUPTURA'; patClass = 'badge-stable';
+            } else if (state.rhythm) {
+                pat = `RITMO c/${state.rhythm}`; patClass = 'badge-stable';
+            } else if (state.dominantZone === 'B') {
+                pat = 'BIG TREND'; patClass = 'badge-zone';
+            } else if (state.dominantZone === 'S') {
+                pat = 'SMALL TREND'; patClass = 'badge-stable';
+            }
+            
+            patEl.textContent = pat;
+            patEl.className = `badge ${patClass}`;
+            
+            if (lastZEl) {
+                lastZEl.textContent = `DOM: ${state.dominantZone === 'B' ? 'BIG' : 'SMALL'} | ${state.dominantDir === 'D' ? 'DER' : 'IZQ'}`;
+                lastZEl.style.color = 'var(--accent)';
+            }
+        } else {
+            patEl.textContent = 'ANALIZANDO...';
+            patEl.className = 'badge badge-stable';
         }
-        const isZigZagDir = dirs.length >= 2 && dirs[dirs.length-1] !== dirs[dirs.length-2];
-        
-        let pat = 'ESTABLE', patClass = 'badge-stable';
-        if (isZigZagDir) { pat = 'ZIG ZAG ↔'; patClass = 'badge-zigzag'; }
-        else if (bigCount >= 3) { pat = 'BIG TREND'; patClass = 'badge-zone'; }
-        else if (smallCount >= 3) { pat = 'SMALL TREND'; patClass = 'badge-stable'; }
-        
-        patEl.textContent = pat;
-        patEl.className = `badge ${patClass}`;
-    }
-
-    // Last zone badge (based on number for the badge, but distance for the table)
-    const lastN = history[history.length - 1];
-    if (lastZEl) {
-        if (lastN >= 1 && lastN <= 9)        { lastZEl.textContent = 'LAST: SMALL'; lastZEl.style.color = 'var(--green)'; }
-        else if (lastN >= 10 && lastN <= 19) { lastZEl.textContent = 'LAST: BIG';   lastZEl.style.color = 'var(--red)'; }
-        else                                 { lastZEl.textContent = `LAST: ${lastN}`; lastZEl.style.color = 'var(--muted)'; }
     }
 
     tbody.innerHTML = history.slice(-50).reverse().map((n, i) => {
