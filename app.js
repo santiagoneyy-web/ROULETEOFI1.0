@@ -320,6 +320,16 @@ function submitNumber(val, silent = false, batch = false) {
 
 // ─── ALARM & NOTIFICATION SYSTEM ───────────────────────────
 let lastAlertSpinsCount = 0;
+let globalAudioCtx = null; // Guardar el contexto desbloqueado
+
+function unlockAudio() {
+    if (!globalAudioCtx) {
+        globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (globalAudioCtx.state === 'suspended') {
+        globalAudioCtx.resume();
+    }
+}
 
 function checkAlarm(hist) {
     if (hist.length < 5) return;
@@ -327,7 +337,7 @@ function checkAlarm(hist) {
     const dirs = [];
     const zones = [];
     
-    // Check last 3 spins (require 4 data points for 3 distances)
+    // Check last 3 spins
     for (let i = hist.length - 3; i < hist.length; i++) {
         const prev = hist[i-1];
         const curr = hist[i];
@@ -336,8 +346,6 @@ function checkAlarm(hist) {
              const absDist = Math.abs(dist);
              dirs.push(dist >= 0 ? 'D' : 'I');
              zones.push((absDist >= 10 && absDist <= 19) ? 'BIG' : 'SMALL');
-             // Consider 'chaos' dists (1-9 = SMALL, 10-19 = BIG). 
-             // Exclude exactly 0 if needed, but absDist > 0 is implied on different numbers
         }
     }
     
@@ -345,43 +353,63 @@ function checkAlarm(hist) {
         const allDirsSame = dirs[0] === dirs[1] && dirs[1] === dirs[2];
         const allZonesSame = zones[0] === zones[1] && zones[1] === zones[2];
         
-        // Es SUPER ESTABLE si la misma zona y misma dirección se han repetido 3 veces seguidas
-        if (allDirsSame && allZonesSame) {
-            // No hacer spam, esperar al menos 2 tiros de diferencia si cambia o sigue
+        // Ahora suena si una de las dos condiciones se cumple (más fácil de que pase)
+        if (allDirsSame || allZonesSame) {
             if (hist.length > lastAlertSpinsCount + 2) {
                 lastAlertSpinsCount = hist.length;
-                fireAlarm(dirs[0], zones[0]);
+                fireAlarm(allDirsSame ? dirs[0] : null, allZonesSame ? zones[0] : null);
             }
         }
     }
 }
 
 function fireAlarm(dirStr, zoneStr) {
-    // 1. Sonido Web Audio (Ding!)
+    // 1. Sonido Web Audio usando el Contexto Desbloqueado
     try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
+        if (!globalAudioCtx) unlockAudio();
+        
+        const osc = globalAudioCtx.createOscillator();
+        const gain = globalAudioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // Nota aguda (A5)
-        osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5);
-        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        
+        // Sonido de alerta triple rápido
+        osc.frequency.setValueAtTime(880, globalAudioCtx.currentTime); // A5
+        osc.frequency.exponentialRampToValueAtTime(440, globalAudioCtx.currentTime + 0.3);
+        
+        gain.gain.setValueAtTime(0.5, globalAudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, globalAudioCtx.currentTime + 0.3);
+        
         osc.connect(gain);
-        gain.connect(audioCtx.destination);
+        gain.connect(globalAudioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.5);
-    } catch(e) {}
+        osc.stop(globalAudioCtx.currentTime + 0.3);
+        
+        // Un segundo bip rápido si es "Super Estable" (Ambos coincidentes)
+        if (dirStr && zoneStr) {
+            setTimeout(() => {
+                try {
+                    const osc2 = globalAudioCtx.createOscillator();
+                    const gain2 = globalAudioCtx.createGain();
+                    osc2.frequency.setValueAtTime(1200, globalAudioCtx.currentTime);
+                    gain2.gain.setValueAtTime(0.5, globalAudioCtx.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.01, globalAudioCtx.currentTime + 0.3);
+                    osc2.connect(gain2);
+                    gain2.connect(globalAudioCtx.destination);
+                    osc2.start();
+                    osc2.stop(globalAudioCtx.currentTime + 0.3);
+                } catch(e){}
+            }, 350);
+        }
+    } catch(e) { console.warn("Audio blocked:", e); }
     
-    // 2. Notificación en Windows/Android (si el usuario dio permiso)
+    const msg = `MESA ${dirStr && zoneStr ? 'SÚPER ' : ''}ESTABLE: ${zoneStr || ''} ${dirStr ? (dirStr==='D'?'DER':'IZQ') : ''}`.trim();
+
+    // 2. Notificación en OS
     if (Notification.permission === 'granted') {
-        new Notification("🔥 OPORTUNIDAD", {
-            body: `Mesa Súper Estable: Zona ${zoneStr} / Dirección ${dirStr === 'D' ? 'DER' : 'IZQ'}`,
-            icon: '🎰'
-        });
+        new Notification("🔥 OPORTUNIDAD", { body: msg, icon: '🎰' });
     }
     
-    // 3. Notificación Visual Flotante (Toast In-App)
+    // 3. Notificación Visual Flotante
     let toast = document.getElementById('stable-toast');
     if (!toast) {
         toast = document.createElement('div');
@@ -396,7 +424,7 @@ function fireAlarm(dirStr, zoneStr) {
         `;
         document.body.appendChild(toast);
     }
-    toast.innerHTML = `🔥 SÚPER ESTABLE: ${zoneStr} + ${dirStr === 'D' ? 'DER' : 'IZQ'}`;
+    toast.innerHTML = `🔥 ${msg}`;
     toast.style.opacity = '1';
     toast.style.transform = 'translate(-50%, 10px)';
     
@@ -405,6 +433,10 @@ function fireAlarm(dirStr, zoneStr) {
         toast.style.transform = 'translate(-50%, 0)';
     }, 4000);
 }
+
+// Global exposure for testing
+window.testAlarm = () => fireAlarm('D', 'BIG');
+
 
 
 // ─── SYNC FROM SERVER ──────────────────────────────────────
@@ -444,6 +476,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Pedir permiso para notificaciones tras el primer click del usuario
     document.body.addEventListener('click', () => {
+        unlockAudio();
         if (Notification.permission === 'default') {
             Notification.requestPermission();
         }
