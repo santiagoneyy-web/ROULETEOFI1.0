@@ -314,8 +314,98 @@ function submitNumber(val, silent = false, batch = false) {
     if (!batch) {
         renderSignalsPanel(lastIaSignals);
         renderTravelPanel();
+        checkAlarm(history);
     }
 }
+
+// ─── ALARM & NOTIFICATION SYSTEM ───────────────────────────
+let lastAlertSpinsCount = 0;
+
+function checkAlarm(hist) {
+    if (hist.length < 5) return;
+    
+    const dirs = [];
+    const zones = [];
+    
+    // Check last 3 spins (require 4 data points for 3 distances)
+    for (let i = hist.length - 3; i < hist.length; i++) {
+        const prev = hist[i-1];
+        const curr = hist[i];
+        if (prev !== undefined) {
+             const dist = calcDist(prev, curr);
+             const absDist = Math.abs(dist);
+             dirs.push(dist >= 0 ? 'D' : 'I');
+             zones.push((absDist >= 10 && absDist <= 19) ? 'BIG' : 'SMALL');
+             // Consider 'chaos' dists (1-9 = SMALL, 10-19 = BIG). 
+             // Exclude exactly 0 if needed, but absDist > 0 is implied on different numbers
+        }
+    }
+    
+    if (dirs.length === 3 && zones.length === 3) {
+        const allDirsSame = dirs[0] === dirs[1] && dirs[1] === dirs[2];
+        const allZonesSame = zones[0] === zones[1] && zones[1] === zones[2];
+        
+        // Es SUPER ESTABLE si la misma zona y misma dirección se han repetido 3 veces seguidas
+        if (allDirsSame && allZonesSame) {
+            // No hacer spam, esperar al menos 2 tiros de diferencia si cambia o sigue
+            if (hist.length > lastAlertSpinsCount + 2) {
+                lastAlertSpinsCount = hist.length;
+                fireAlarm(dirs[0], zones[0]);
+            }
+        }
+    }
+}
+
+function fireAlarm(dirStr, zoneStr) {
+    // 1. Sonido Web Audio (Ding!)
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // Nota aguda (A5)
+        osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+    } catch(e) {}
+    
+    // 2. Notificación en Windows/Android (si el usuario dio permiso)
+    if (Notification.permission === 'granted') {
+        new Notification("🔥 OPORTUNIDAD", {
+            body: `Mesa Súper Estable: Zona ${zoneStr} / Dirección ${dirStr === 'D' ? 'DER' : 'IZQ'}`,
+            icon: '🎰'
+        });
+    }
+    
+    // 3. Notificación Visual Flotante (Toast In-App)
+    let toast = document.getElementById('stable-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'stable-toast';
+        toast.style.cssText = `
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: linear-gradient(145deg, var(--gold), #c99318);
+            color: #000; padding: 12px 24px; border-radius: 30px;
+            font-family: var(--mono); font-weight: 900; font-size: 13px;
+            z-index: 9999; box-shadow: 0 6px 20px rgba(240,192,64,0.5);
+            opacity: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s;
+        `;
+        document.body.appendChild(toast);
+    }
+    toast.innerHTML = `🔥 SÚPER ESTABLE: ${zoneStr} + ${dirStr === 'D' ? 'DER' : 'IZQ'}`;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translate(-50%, 10px)';
+    
+    setTimeout(() => { 
+        toast.style.opacity = '0'; 
+        toast.style.transform = 'translate(-50%, 0)';
+    }, 4000);
+}
+
 
 // ─── SYNC FROM SERVER ──────────────────────────────────────
 async function syncData() {
@@ -351,6 +441,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Immediate render with placeholders
     renderSignalsPanel(lastIaSignals);
     renderTravelPanel();
+
+    // Pedir permiso para notificaciones tras el primer click del usuario
+    document.body.addEventListener('click', () => {
+        if (Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }, { once: true });
+
 
     // Load tables from API
     try {
