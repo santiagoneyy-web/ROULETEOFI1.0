@@ -153,32 +153,147 @@ function getSixStrategieSignals(lastNum) {
     });
 }
 
+// ============================================================
+// PATTERN ANALYSIS ENGINE — Zone & Direction Learning
+// ============================================================
+
+function buildZoneSequence(history) {
+    // Convert history into B/S array using actual wheel distances
+    const seq = [];
+    for (let i = 1; i < history.length; i++) {
+        const dist = Math.abs(getDistance(history[i-1], history[i]));
+        seq.push(dist >= 10 ? 'B' : 'S');
+    }
+    return seq;
+}
+
+function buildDirSequence(history) {
+    // Convert history into D/I array using wheel direction
+    const seq = [];
+    for (let i = 1; i < history.length; i++) {
+        const dist = getDistance(history[i-1], history[i]);
+        seq.push(dist >= 0 ? 'D' : 'I');
+    }
+    return seq;
+}
+
+function getRunLengths(seq) {
+    // Groups a sequence into {type, length} runs. e.g. SSSBBSB → [{S,3},{B,2},{S,1},{B,1}]
+    if (seq.length === 0) return [];
+    const runs = [];
+    let current = seq[0], count = 1;
+    for (let i = 1; i < seq.length; i++) {
+        if (seq[i] === current) count++;
+        else { runs.push({ type: current, length: count }); current = seq[i]; count = 1; }
+    }
+    runs.push({ type: current, length: count });
+    return runs;
+}
+
+function getDominant(seq, windowSize = 20) {
+    // Returns the dominant type in the recent window
+    if (seq.length === 0) return null;
+    const recent = seq.slice(-Math.min(windowSize, seq.length));
+    const tally = {};
+    recent.forEach(v => { tally[v] = (tally[v] || 0) + 1; });
+    return Object.keys(tally).reduce((a, b) => tally[a] >= tally[b] ? a : b);
+}
+
+function detectFalseBreak(runs, dominantType) {
+    // A "false break" is when the last run is the OPPOSITE type,
+    // but so short that it's clearly noise (< 30% of avg dominant run length)
+    if (runs.length < 2) return false;
+    const lastRun = runs[runs.length - 1];
+    if (lastRun.type === dominantType) return false; // Last run IS dominant → no false break
+    const dominantRuns = runs.filter(r => r.type === dominantType);
+    if (dominantRuns.length === 0) return false;
+    const avgDominantLen = dominantRuns.reduce((a, r) => a + r.length, 0) / dominantRuns.length;
+    return lastRun.length < avgDominantLen * 0.30;
+}
+
+function detectStreakShrinkage(runs, dominantType) {
+    // Checks if the last 3 dominant runs are getting progressively SHORTER → real zone transition
+    const dominantRuns = runs.filter(r => r.type === dominantType);
+    if (dominantRuns.length < 3) return false;
+    const last3 = dominantRuns.slice(-3);
+    return last3[0].length > last3[1].length && last3[1].length > last3[2].length;
+}
+
+function detectTrueZigZag(seq) {
+    // 5+ consecutive alternations at the tail of the sequence → genuine ZigZag
+    if (seq.length < 5) return false;
+    const recent = seq.slice(-8);
+    let alternations = 0;
+    for (let i = 1; i < recent.length; i++) {
+        if (recent[i] !== recent[i-1]) alternations++;
+        else break;
+    }
+    return alternations >= 5;
+}
+
+function detectRhythm(runs, dominantType) {
+    // Detects regular intervals between non-dominant intrusions → cyclic table behavior
+    const positions = [];
+    let pos = 0;
+    for (const run of runs) {
+        if (run.type !== dominantType) positions.push(pos);
+        pos += run.length;
+    }
+    if (positions.length < 3) return null;
+    const intervals = [];
+    for (let i = 1; i < positions.length; i++) intervals.push(positions[i] - positions[i-1]);
+    const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const stdDev = Math.sqrt(intervals.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / intervals.length);
+    // Low stdDev relative to avg means regular rhythm
+    return stdDev < avg * 0.30 ? Math.round(avg) : null;
+}
+
+function analyzeTableState(history) {
+    const empty = { zoneSeq:[], dirSeq:[], dominantZone:'S', dominantDir:'D',
+                    isFalseBreak:false, isZoneTransition:false,
+                    isDirZigZag:false, isZoneZigZag:false, rhythm:null };
+    if (history.length < 5) return empty;
+
+    const zoneSeq = buildZoneSequence(history);
+    const dirSeq  = buildDirSequence(history);
+    const zoneRuns = getRunLengths(zoneSeq);
+    const dirRuns  = getRunLengths(dirSeq);
+
+    const dominantZone = getDominant(zoneSeq) || 'S';
+    const dominantDir  = getDominant(dirSeq)  || 'D';
+
+    const isFalseBreak      = detectFalseBreak(zoneRuns, dominantZone);
+    const isZoneTransition  = detectStreakShrinkage(zoneRuns, dominantZone);
+    const isDirZigZag       = detectTrueZigZag(dirSeq);
+    const isZoneZigZag      = detectTrueZigZag(zoneSeq);
+    const rhythm            = detectRhythm(zoneRuns, dominantZone);
+
+    return { zoneSeq, dirSeq, zoneRuns, dirRuns,
+             dominantZone, dominantDir,
+             isFalseBreak, isZoneTransition,
+             isDirZigZag, isZoneZigZag, rhythm };
+}
+
+// ============================================================
+// MASTER SIGNAL ENGINE — Soporte & Híbrido Theory
+// ============================================================
+
 function getIAMasterSignals(prox, sig, history) {
     if (!sig || history.length === 0) return [];
     const lastNum = history[history.length - 1];
+    const lastNumIdx = WHEEL_INDEX[lastNum] || 0;
     const signals = [];
 
-    // Analyze Patterns
-    const isBigTrend = history.slice(-5).filter(n => n >= 10 && n <= 19).length >= 3;
-    const isSmallTrend = history.slice(-5).filter(n => n >= 1 && n <= 9).length >= 3;
-    
-    // Zig Zag Detectors
-    const isDirZigZag = history.length >= 3 && Math.sign(calcDist(history[history.length-2], history[history.length-1])) !== Math.sign(calcDist(history[history.length-3], history[history.length-2]));
-    const isZoneZigZag = history.length >= 3 && (history[history.length-1] >= 10 && history[history.length-1] <= 19) !== (history[history.length-2] >= 10 && history[history.length-2] <= 19);
+    // ── READ TABLE STATE FROM DATABASE PATTERNS ────────────────
+    const state = analyzeTableState(history);
 
-    // 1. Android n16 (Six Strategie - The User's Core Logic)
-    // Intelligent Selection: Find which strategy is hitting best in the last 10 spins
+    // ── AGENT 1: Android n16 (Six Strategie) ──────────────────
     const ssOutcomes = getSixStrategieSignals(lastNum);
-    let bestSS = ssOutcomes[0];
-    let maxHits = -1;
-
+    let bestSS = ssOutcomes[0], maxHits = -1;
     ssOutcomes.forEach(strategy => {
         let hits = 0;
-        // Check performance in last 10 spins
         for (let i = Math.max(0, history.length - 10); i < history.length - 1; i++) {
-            const hNum = history[i];
-            const nextHNum = history[i+1];
-            // Re-calculate what THIS strategy would have predicted at that moment
+            const hNum = history[i], nextHNum = history[i+1];
             const t = hNum % 10;
             let predBase = 0;
             if (strategy.name === '+') predBase = hNum + t;
@@ -187,106 +302,152 @@ function getIAMasterSignals(prox, sig, history) {
             else if (strategy.name === '-,-1') predBase = hNum - t - 1;
             else if (strategy.name === '+,+1') predBase = hNum + t + 1;
             else if (strategy.name === '+,-1') predBase = hNum + t - 1;
-            
-            const predTP = (predBase + 37) % 37;
+            const predTP = ((predBase % 37) + 37) % 37;
             const predCors = TERMINALS_MAP[predTP] || [];
-            
-            // Count hit if next number is in TP or COR neighbors
-            const tpRad = (predCors.length >= 3) ? 2 : 2; 
-            const corRad = (predCors.length === 1) ? 3 : (predCors.length === 2 ? 3 : 2);
-            
-            const isHit = getWheelNeighbors(predTP, tpRad).includes(nextHNum) || 
+            const tpRad = 2, corRad = predCors.length === 1 ? 3 : (predCors.length === 2 ? 3 : 2);
+            const isHit = getWheelNeighbors(predTP, tpRad).includes(nextHNum) ||
                           predCors.some(c => getWheelNeighbors(c, corRad).includes(nextHNum));
-            
             if (isHit) hits++;
         }
-        if (hits > maxHits) {
-            maxHits = hits;
-            bestSS = strategy;
-        }
+        if (hits > maxHits) { maxHits = hits; bestSS = strategy; }
     });
-
     signals.push({
-        name: 'Android n16',
-        tp: bestSS.tp,
-        cor: bestSS.cors,
-        betZone: bestSS.betZone,
-        number: bestSS.tp,
-        confidence: "94%",
-        reason: `${bestSS.name} (Hits: ${maxHits}/10)`,
-        rule: 'SIX STRATEGIE',
-        mode: 'ZONAS',
-        radius: "N2/N3"
+        name: 'Android n16', tp: bestSS.tp, cor: bestSS.cors,
+        betZone: bestSS.betZone, number: bestSS.tp, confidence: "94%",
+        reason: `${bestSS.name} (Hits: ${maxHits}/10)`, rule: 'SIX STRATEGIE',
+        mode: 'ZONAS', radius: "N2/N3"
     });
 
-    // 2. Android n17 (SOPORTE + HIBRIDO)
-    let target17 = sig.casilla1;
-    if (history.length > 5 && Math.abs(sig.avgTravel) < 5) target17 = sig.casilla10; 
+    // ── AGENT 2: Android N17 — ZONE READER (Soporte C1/C19) ──
+    let target17, reason17, mode17;
+    if (state.isZoneTransition) {
+        // Zone is ACTIVELY SHRINKING → anticipate the flip and pre-position on NEW zone
+        const newZone = state.dominantZone === 'B' ? 'S' : 'B';
+        target17 = newZone === 'B' ? sig.casilla19 : sig.casilla1;
+        reason17 = `TRANSICIÓN ${state.dominantZone}→${newZone}: SOPORTE NUEVO`;
+        mode17   = newZone === 'B' ? 'SOPORTE BIG' : 'SOPORTE SMALL';
+    } else if (state.isFalseBreak) {
+        // False break detected → stay in current dominant zone, don't react
+        target17 = state.dominantZone === 'B' ? sig.casilla19 : sig.casilla1;
+        reason17 = `FALSA RUPTURA IGNORADA → ZONA ${state.dominantZone}`;
+        mode17   = state.dominantZone === 'B' ? 'SOPORTE BIG' : 'SOPORTE SMALL';
+    } else {
+        // Normal soporte: match dominant zone
+        target17 = state.dominantZone === 'B' ? sig.casilla19 : sig.casilla1;
+        reason17 = state.dominantZone === 'B' ? 'ZONA BIG → SOPORTE C19' : 'ZONA SMALL → SOPORTE C1';
+        mode17   = state.dominantZone === 'B' ? 'SOPORTE BIG' : 'SOPORTE SMALL';
+    }
     signals.push({
-        name: 'Android n17',
-        number: target17,
-        confidence: "88%",
-        reason: target17 === sig.casilla10 ? "HIBRIDO" : "SOPORTE",
-        rule: "FISICA/SOPORTE",
-        mode: "ESCUDO",
-        betZone: getWheelNeighbors(target17, 9),
-        radius: "N9"
+        name: 'Android n17', number: target17, confidence: "88%",
+        reason: reason17, rule: "SOPORTE ZONA", mode: mode17,
+        betZone: getWheelNeighbors(target17, 9), radius: "N9"
     });
 
-    // 3. Android 1717 (SOPORTE + HIBRIDO + ZIG ZAG)
-    let target1717 = sig.casilla10; 
-    if (isDirZigZag || isZoneZigZag) target1717 = sig.casilla19; 
+    // ── AGENT 3: Android 1717 — DIRECTION READER (Híbrido C±10) ──
+    let target1717, reason1717, mode1717;
+    if (state.isDirZigZag) {
+        // True ZigZag of directions → Híbrido INVERSO (opposite of last direction)
+        const lastDir = state.dirSeq[state.dirSeq.length - 1];
+        const inverseSign = lastDir === 'D' ? -1 : 1;
+        const idx1717 = (lastNumIdx + (10 * inverseSign) + 37) % 37;
+        target1717 = WHEEL_ORDER[idx1717];
+        reason1717 = `ZIGZAG DIR REAL → HÍBRIDO INVERSO (última:${lastDir})`;
+        mode1717   = 'HÍBRIDO INVERSO';
+    } else {
+        // Normal híbrido: follow dominant direction
+        const dirSign = state.dominantDir === 'D' ? 1 : -1;
+        const idx1717 = (lastNumIdx + (10 * dirSign) + 37) % 37;
+        target1717 = WHEEL_ORDER[idx1717];
+        reason1717 = state.dominantDir === 'D' ? 'DIR DER → HÍBRIDO C+10' : 'DIR IZQ → HÍBRIDO C-10';
+        mode1717   = state.dominantDir === 'D' ? 'HÍBRIDO DER' : 'HÍBRIDO IZQ';
+    }
     signals.push({
-        name: 'Android 1717',
-        number: target1717,
-        confidence: "90%",
-        reason: (isDirZigZag || isZoneZigZag) ? "ZIGZAG SOPORTE" : "ATAQUE HIBRIDO",
-        rule: "HIBRIDO/ZIGZAG",
-        mode: 'ATAQUE',
-        betZone: getWheelNeighbors(target1717, 9),
-        radius: "N9"
+        name: 'Android 1717', number: target1717, confidence: "90%",
+        reason: reason1717, rule: "HÍBRIDO DIR", mode: mode1717,
+        betZone: getWheelNeighbors(target1717, 9), radius: "N9"
     });
 
-    // 4. N18 (SOPORTE PURO)
-    let targetSoporte = isBigTrend ? sig.casilla19 : sig.casilla1;
+    // ── AGENT 4: N18 — CHANGE DETECTOR (Rhythm, ZigZag, Transition) ──
+    let targetN18, reasonN18, modeN18;
+    if (state.isZoneZigZag) {
+        // Zone zigzagging → current dominant zone soporte to anchor
+        targetN18 = state.dominantZone === 'B' ? sig.casilla19 : sig.casilla1;
+        reasonN18 = `ZIGZAG ZONA → ANCLAJE ${state.dominantZone}`;
+        modeN18   = 'ZIGZAG ZONA';
+    } else if (state.isZoneTransition) {
+        // Real transition → soporte on the incoming zone
+        targetN18 = state.dominantZone === 'B' ? sig.casilla1 : sig.casilla19;
+        reasonN18 = `TRANSICIÓN REAL → SOPORTE ${state.dominantZone === 'B' ? 'SMALL' : 'BIG'}`;
+        modeN18   = 'TRANSICIÓN';
+    } else if (state.rhythm) {
+        // Rhythmic table → maintain dominant zone (it's a cycle, not a change)
+        targetN18 = state.dominantZone === 'B' ? sig.casilla19 : sig.casilla1;
+        reasonN18 = `RITMO DETECTADO (c/${state.rhythm}) → MANTENER ${state.dominantZone}`;
+        modeN18   = 'RITMO ESTABLE';
+    } else {
+        targetN18 = state.dominantZone === 'B' ? sig.casilla19 : sig.casilla1;
+        reasonN18 = `SOPORTE ZONA ${state.dominantZone}`;
+        modeN18   = state.dominantZone === 'B' ? 'SOPORTE BIG' : 'SOPORTE SMALL';
+    }
     signals.push({
-        name: 'N18',
-        number: targetSoporte,
-        confidence: "86%",
-        reason: isBigTrend ? "SOPORTE BIG" : "SOPORTE SMALL",
-        rule: "SOPORTE",
-        mode: 'SOPORTE',
-        betZone: getWheelNeighbors(targetSoporte, 9),
-        radius: "N9"
+        name: 'N18', number: targetN18, confidence: "86%",
+        reason: reasonN18, rule: "DETECTOR CAMBIOS", mode: modeN18,
+        betZone: getWheelNeighbors(targetN18, 9), radius: "N9"
     });
 
-    // 5. CELULA (COMBINADO TOTAL - SNIPER HYBRID)
-    // Primary: n9 target based on physics, Secondary: n4 snipes on small/big
-    let targetSnipe = isBigTrend ? sig.casilla14 : sig.casilla5;
-    if (isZoneZigZag) targetSnipe = (history[history.length-1] >= 10 && history[history.length-1] <= 19) ? sig.casilla5 : sig.casilla14;
-    
+    // ── AGENT 5: CÉLULA — FUSION SNIPER ────────────────────────
+    let targetCelula, reasonCelula, modeCelula;
+    const dirSign = state.dominantDir === 'D' ? 1 : -1;
+
+    if (state.isDirZigZag && state.isZoneTransition) {
+        // Full chaos → anchor to opposite zone for safety
+        targetCelula = state.dominantZone === 'B' ? sig.casilla1 : sig.casilla19;
+        reasonCelula = 'CAOS TOTAL → SOPORTE INVERSO';
+        modeCelula   = 'CAOS';
+    } else if (state.isDirZigZag) {
+        // Direction zigzag only → Híbrido Inverso as snipe
+        const lastDir = state.dirSeq[state.dirSeq.length - 1];
+        const invSign = lastDir === 'D' ? -1 : 1;
+        const idxC = (lastNumIdx + (10 * invSign) + 37) % 37;
+        targetCelula = WHEEL_ORDER[idxC];
+        reasonCelula = 'ZIGZAG DIR → SNIPE HÍBRIDO INVERSO';
+        modeCelula   = 'SNIPE INVERSO';
+    } else if (state.dominantZone === 'B') {
+        // Big zone confirmed → snipe C14 in dominant direction
+        const idxC = (lastNumIdx + (14 * dirSign) + 37) % 37;
+        targetCelula = WHEEL_ORDER[idxC];
+        reasonCelula = `ZONA BIG + DIR ${state.dominantDir} → SNIPE C14`;
+        modeCelula   = 'SNIPE BIG';
+    } else {
+        // Small zone → snipe C5 in dominant direction
+        const idxC = (lastNumIdx + (5 * dirSign) + 37) % 37;
+        targetCelula = WHEEL_ORDER[idxC];
+        reasonCelula = `ZONA SMALL + DIR ${state.dominantDir} → SNIPE C5`;
+        modeCelula   = 'SNIPE SMALL';
+    }
     signals.push({
-        name: 'CELULA',
-        number: targetSnipe,
-        top: targetSnipe,
-        confidence: "92%",
-        reason: "SNIPE COMBINADO",
-        rule: "SNIPER",
-        mode: 'GANANCIA',
-        betZone: getWheelNeighbors(targetSnipe, 9), // Main target is n9
-        radius: "N9",
-        smallSnipe: sig.casilla5,
-        bigSnipe: sig.casilla14
+        name: 'CELULA', number: targetCelula, top: targetCelula, confidence: "95%",
+        reason: reasonCelula, rule: "FUSION SNIPER", mode: modeCelula,
+        betZone: getWheelNeighbors(targetCelula, 9), radius: "N9",
+        smallSnipe: sig.casilla5, bigSnipe: sig.casilla14
     });
 
-    // Populate secondary snipes for all agents to fill the 3-column UI
+    // ── POPULATE METADATA FOR ALL SIGNALS ──────────────────────
     signals.forEach(s => {
-        s.smallSnipe = sig.casilla5 !== undefined ? sig.casilla5 : '--';
-        s.bigSnipe = sig.casilla14 !== undefined ? sig.casilla14 : '--';
+        s.smallSnipe  = sig.casilla5  !== undefined ? sig.casilla5  : '--';
+        s.bigSnipe    = sig.casilla14 !== undefined ? sig.casilla14 : '--';
+        s.dominance   = state.dominantZone === 'B' ? 'BIG'   : 'SMALL';
+        s.trend       = state.dominantDir  === 'D' ? 'DER'   : 'IZQ';
+        s.isDirZigZag = state.isDirZigZag;
+        s.isZoneZigZag= state.isZoneZigZag;
+        s.isUnstable  = state.isDirZigZag || state.isZoneZigZag;
+        s.patternCode = state.dominantZone;
+        s.isWeakening = state.isZoneTransition;
     });
 
     return signals;
 }
+
 
 // Ensure calcDist is available globally if needed by predictor.js
 function calcDist(from, to) {
