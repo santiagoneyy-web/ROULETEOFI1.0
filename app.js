@@ -636,19 +636,25 @@ window.testAlarm = () => fireAlarm('D', 'BIG');
 
 
 // ─── SYNC FROM SERVER ──────────────────────────────────────
+let currentLastSpinId = null;
+
 async function syncData() {
     if (!currentTableId) return;
     try {
         const r = await fetch(`/api/history/${currentTableId}`);
         if (!r.ok) return;
         const spins = await r.json();
-        if (spins.length !== history.length) {
+        
+        const incomingLastSpinId = spins.length > 0 ? (spins[spins.length - 1].id || spins[spins.length - 1]._id) : null;
+        
+        if (spins.length !== history.length || incomingLastSpinId !== currentLastSpinId) {
             history.length = 0;
             iaSignalsHistory.forEach(h => h.length = 0);
             for (const s of spins) submitNumber(s.number, true, true);
             renderSignalsPanel(lastIaSignals);
             renderTravelChart();
             renderTravelPanel();
+            currentLastSpinId = incomingLastSpinId;
         }
     } catch(e) {}
 }
