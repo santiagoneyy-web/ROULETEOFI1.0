@@ -481,3 +481,68 @@ canvas#wheel-canvas { width: 130px; height: 130px; }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ══════════ TRAVEL CHART ══════════ */
+.travel-chart-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 0 8px;
+}
+.travel-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.travel-chart-legend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: var(--text2);
+  font-family: var(--mono);
+}
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot-green  { background: #30e090; }
+.dot-red    { background: #f04060; }
+.dot-orange { background: #ff8c40; }
+.dot-yellow { background: #f0c040; }
+.travel-chart-wrap {
+  position: relative;
+  background: #0d1520;
+  border-radius: 8px;
+  border: 1px solid #1a2a3d;
+  overflow: hidden;
+}
+.travel-chart-wrap canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.chart-zone-label {
+  position: absolute;
+  font-family: var(--mono);
+  font-weight: 900;
+  font-size: 14px;
+  opacity: 0.12;
+  pointer-events: none;
+}
+.chart-cw {
+  top: 14px; right: 14px;
+  color: #30e090;
+}
+.chart-ccw {
+  bottom: 14px; right: 14px;
+  color: #c090ff;
+}

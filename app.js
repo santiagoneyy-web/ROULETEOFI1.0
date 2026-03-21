@@ -188,6 +188,182 @@ function renderSignalsPanel(signals) {
     renderWheelAndHistory();
 }
 
+// ─── RENDER: TRAVEL CHART (Shadow Roulette Style) ──────────
+function renderTravelChart() {
+    const canvas = document.getElementById('travel-chart-canvas');
+    if (!canvas || history.length < 3) return;
+    
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    
+    // Calculate travel distances (signed: positive = CW/DER, negative = CCW/IZQ)
+    const travels = [];
+    for (let i = 1; i < history.length; i++) {
+        travels.push(calcDist(history[i-1], history[i]));
+    }
+    if (travels.length < 2) return;
+    
+    // Show last 30 spins max for readability
+    const maxPoints = 30;
+    const data = travels.slice(-maxPoints);
+    const numPoints = data.length;
+    
+    // Calculate CW and CCW running averages
+    const cwValues = data.filter(d => d > 0);
+    const ccwValues = data.filter(d => d < 0);
+    const avgCW = cwValues.length > 0 ? cwValues.reduce((a,b) => a+b, 0) / cwValues.length : 5;
+    const avgCCW = ccwValues.length > 0 ? ccwValues.reduce((a,b) => a+b, 0) / ccwValues.length : -5;
+    
+    // Range (standard deviation-ish bands)
+    const allAbs = data.map(d => Math.abs(d));
+    const avgAbs = allAbs.reduce((a,b) => a+b, 0) / allAbs.length;
+    const stdDev = Math.sqrt(allAbs.reduce((a,b) => a + Math.pow(b - avgAbs, 2), 0) / allAbs.length);
+    const upperRange = avgCW + stdDev;
+    const lowerRange = avgCCW - stdDev;
+    
+    // Chart dimensions
+    const padL = 30, padR = 10, padT = 15, padB = 20;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+    const midY = padT + chartH / 2;
+    
+    // Scale: max travel is 18 pockets
+    const maxVal = 18;
+    const scaleY = (val) => midY - (val / maxVal) * (chartH / 2);
+    const scaleX = (i) => padL + (i / (numPoints - 1)) * chartW;
+    
+    // ── Background grid ──
+    ctx.strokeStyle = '#1a2a3d';
+    ctx.lineWidth = 0.5;
+    // Horizontal grid lines
+    for (let v = -15; v <= 15; v += 5) {
+        const y = scaleY(v);
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(W - padR, y);
+        ctx.stroke();
+    }
+    // Zero line (thicker)
+    ctx.strokeStyle = '#2a3a5d';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, midY);
+    ctx.lineTo(W - padR, midY);
+    ctx.stroke();
+    
+    // ── Y-axis labels ──
+    ctx.fillStyle = '#4a6080';
+    ctx.font = '9px Inter';
+    ctx.textAlign = 'right';
+    for (let v = -15; v <= 15; v += 5) {
+        if (v === 0) continue;
+        ctx.fillText(v > 0 ? `+${v}` : `${v}`, padL - 4, scaleY(v) + 3);
+    }
+    ctx.fillText('0', padL - 4, midY + 3);
+    
+    // ── X-axis labels ──
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#3a5070';
+    const step = Math.max(1, Math.floor(numPoints / 8));
+    for (let i = 0; i < numPoints; i += step) {
+        ctx.fillText(travels.length - numPoints + i + 1, scaleX(i), H - 4);
+    }
+    
+    // ── Range bands (yellow/orange horizontal bands) ──
+    // Upper range band (CW zone)
+    ctx.strokeStyle = 'rgba(240, 192, 64, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(padL, scaleY(upperRange));
+    ctx.lineTo(W - padR, scaleY(upperRange));
+    ctx.stroke();
+    // Lower range band (CCW zone)
+    ctx.strokeStyle = 'rgba(100, 180, 255, 0.4)';
+    ctx.beginPath();
+    ctx.moveTo(padL, scaleY(lowerRange));
+    ctx.lineTo(W - padR, scaleY(lowerRange));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // ── Average CW line (red, horizontal) ──
+    ctx.strokeStyle = '#f04060';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 3]);
+    ctx.beginPath();
+    ctx.moveTo(padL, scaleY(avgCW));
+    ctx.lineTo(W - padR, scaleY(avgCW));
+    ctx.stroke();
+    
+    // ── Average CCW line (orange, horizontal) ──
+    ctx.strokeStyle = '#ff8c40';
+    ctx.beginPath();
+    ctx.moveTo(padL, scaleY(avgCCW));
+    ctx.lineTo(W - padR, scaleY(avgCCW));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // ── CW fill zone (green tint above 0) ──
+    ctx.fillStyle = 'rgba(48, 224, 144, 0.04)';
+    ctx.fillRect(padL, padT, chartW, chartH / 2);
+    
+    // ── CCW fill zone (purple tint below 0) ──
+    ctx.fillStyle = 'rgba(192, 144, 255, 0.04)';
+    ctx.fillRect(padL, midY, chartW, chartH / 2);
+    
+    // ── Main travel line (green) ──
+    ctx.strokeStyle = '#30e090';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < numPoints; i++) {
+        const x = scaleX(i);
+        const y = scaleY(data[i]);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    
+    // ── Data points (circles on the green line) ──
+    for (let i = 0; i < numPoints; i++) {
+        const x = scaleX(i);
+        const y = scaleY(data[i]);
+        const isCW = data[i] >= 0;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = isCW ? '#30e090' : '#c090ff';
+        ctx.fill();
+        ctx.strokeStyle = '#0d1520';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+    
+    // ── Last point highlight (glow) ──
+    if (numPoints > 0) {
+        const lx = scaleX(numPoints - 1);
+        const ly = scaleY(data[numPoints - 1]);
+        ctx.beginPath();
+        ctx.arc(lx, ly, 6, 0, Math.PI * 2);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = data[numPoints - 1] >= 0 ? '#30e090' : '#c090ff';
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        
+        // Value label on last point
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 10px JetBrains Mono';
+        ctx.textAlign = 'center';
+        const val = data[numPoints - 1];
+        ctx.fillText((val > 0 ? '+' : '') + val, lx, ly - 10);
+    }
+}
+
 // ─── RENDER: TRAVEL TABLE ──────────────────────────────────
 function renderTravelPanel() {
     const tbody   = document.getElementById('travel-tbody');
@@ -315,6 +491,7 @@ function submitNumber(val, silent = false, batch = false) {
 
     if (!batch) {
         renderSignalsPanel(lastIaSignals);
+        renderTravelChart();
         renderTravelPanel();
         checkAlarm(history);
     }
@@ -453,6 +630,7 @@ async function syncData() {
             iaSignalsHistory.forEach(h => h.length = 0);
             for (const s of spins) submitNumber(s.number, true, true);
             renderSignalsPanel(lastIaSignals);
+            renderTravelChart();
             renderTravelPanel();
         }
     } catch(e) {}
