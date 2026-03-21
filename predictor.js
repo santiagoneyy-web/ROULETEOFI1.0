@@ -95,6 +95,8 @@ function computeDealerSignature(history) {
         travelHistory: travels,
         casilla5: WHEEL_ORDER[(WHEEL_INDEX[history[history.length-1]] + 5) % 37],
         casilla14: WHEEL_ORDER[(WHEEL_INDEX[history[history.length-1]] + 14) % 37],
+        casillaNeg5: WHEEL_ORDER[(WHEEL_INDEX[history[history.length-1]] - 5 + 37) % 37],
+        casillaNeg14: WHEEL_ORDER[(WHEEL_INDEX[history[history.length-1]] - 14 + 37) % 37],
         casilla1: WHEEL_ORDER[(WHEEL_INDEX[history[history.length-1]] + 1) % 37],
         casilla19: WHEEL_ORDER[(WHEEL_INDEX[history[history.length-1]] + 19) % 37],
         casilla10: WHEEL_ORDER[(WHEEL_INDEX[history[history.length-1]] + 10) % 37]
@@ -397,39 +399,50 @@ function getIAMasterSignals(prox, sig, history) {
 
     // ── AGENT 5: CÉLULA — FUSION SNIPER ────────────────────────
     let targetCelula, reasonCelula, modeCelula;
+    let inverseCelula, reasonInverso;
     const dirSign = state.dominantDir === 'D' ? 1 : -1;
+    const invDirSign = dirSign * -1;
 
     if (state.isDirZigZag && state.isZoneTransition) {
-        // Full chaos → anchor to opposite zone for safety
         targetCelula = state.dominantZone === 'B' ? sig.casilla1 : sig.casilla19;
         reasonCelula = 'CAOS TOTAL → SOPORTE INVERSO';
         modeCelula   = 'CAOS';
+        inverseCelula = state.dominantZone === 'B' ? sig.casilla19 : sig.casilla1;
+        reasonInverso = 'CAOS TOTAL → SOPORTE NORMAL';
     } else if (state.isDirZigZag) {
-        // Direction zigzag only → Híbrido Inverso as snipe
         const lastDir = state.dirSeq[state.dirSeq.length - 1];
         const invSign = lastDir === 'D' ? -1 : 1;
         const idxC = (lastNumIdx + (10 * invSign) + 37) % 37;
         targetCelula = WHEEL_ORDER[idxC];
         reasonCelula = 'ZIGZAG DIR → SNIPE HÍBRIDO INVERSO';
         modeCelula   = 'SNIPE INVERSO';
+        const idxInv = (lastNumIdx + (10 * invSign * -1) + 37) % 37;
+        inverseCelula = WHEEL_ORDER[idxInv];
+        reasonInverso = 'ZIGZAG DIR → SNIPE HÍBRIDO NORMAL';
     } else if (state.dominantZone === 'B') {
-        // Big zone confirmed → snipe C14 in dominant direction
         const idxC = (lastNumIdx + (14 * dirSign) + 37) % 37;
         targetCelula = WHEEL_ORDER[idxC];
         reasonCelula = `ZONA BIG + DIR ${state.dominantDir} → SNIPE C14`;
         modeCelula   = 'SNIPE BIG';
+        const idxInv = (lastNumIdx + (14 * invDirSign) + 37) % 37;
+        inverseCelula = WHEEL_ORDER[idxInv];
+        reasonInverso = `ZONA BIG + DIR INV → SNIPE C14 INV`;
     } else {
-        // Small zone → snipe C5 in dominant direction
         const idxC = (lastNumIdx + (5 * dirSign) + 37) % 37;
         targetCelula = WHEEL_ORDER[idxC];
         reasonCelula = `ZONA SMALL + DIR ${state.dominantDir} → SNIPE C5`;
         modeCelula   = 'SNIPE SMALL';
+        const idxInv = (lastNumIdx + (5 * invDirSign) + 37) % 37;
+        inverseCelula = WHEEL_ORDER[idxInv];
+        reasonInverso = `ZONA SMALL + DIR INV → SNIPE C5 INV`;
     }
     signals.push({
         name: 'CELULA', number: targetCelula, top: targetCelula, confidence: "95%",
         reason: reasonCelula, rule: "FUSION SNIPER", mode: modeCelula,
         betZone: getWheelNeighbors(targetCelula, 9), radius: "N9",
-        smallSnipe: sig.casilla5, bigSnipe: sig.casilla14
+        smallSnipe: sig.casilla5, bigSnipe: sig.casilla14,
+        numberInverso: inverseCelula, reasonInverso: reasonInverso,
+        smallSnipeInverso: sig.casillaNeg5, bigSnipeInverso: sig.casillaNeg14
     });
 
     // ── POPULATE METADATA FOR ALL SIGNALS ──────────────────────

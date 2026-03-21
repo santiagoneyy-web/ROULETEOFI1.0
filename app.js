@@ -3,20 +3,21 @@
 // ============================================================
 
 const history      = [];
-const iaSignalsHistory = [ [], [], [], [], [] ]; 
+const iaSignalsHistory = [ [], [], [], [], [], [] ]; 
 let activeIaTab    = 0; 
 let lastIaSignals = [
     { top: 17, rule: 'READY', radius:'N9', smallSnipe: 5, bigSnipe: 14 },
     { top: 16, rule: 'READY', radius:'N2/N3', smallSnipe: 5, bigSnipe: 14  },
     { top: 5,  rule: 'READY', radius:'N9', smallSnipe: 5, bigSnipe: 14  },
     { top: 22, rule: 'READY', radius:'N9', smallSnipe: 5, bigSnipe: 14  },
-    { top: 10, rule: 'READY', radius:'N4', smallSnipe: 5, bigSnipe: 14  }
+    { top: 10, rule: 'READY', radius:'N4', smallSnipe: 5, bigSnipe: 14  },
+    { top: '--', rule: 'READY', radius:'N9', smallSnipe: '--', bigSnipe: '--' }
 ]; 
 
 // Agent names as per user request
-const AGENT_NAMES   = ['Android N17', 'Android N16', 'Android 1717', 'Android N18', 'CÉLULA'];
-const AGENT_KEYS    = ['N17', 'N16', 'N17PLUS', 'N18', 'CELULA'];
-const AGENT_MODES   = ['SOPORTE/HIBRIDO', 'SIX STRATEGIE', 'HIBRIDO/ZIGZAG', 'SOPORTE PURO', 'SNIPER'];
+const AGENT_NAMES   = ['Android N17', 'Android N16', 'Android 1717', 'Android N18', 'CÉLULA', 'CÉLULA 2'];
+const AGENT_KEYS    = ['N17', 'N16', 'N17PLUS', 'N18', 'CELULA', 'CEL-INV'];
+const AGENT_MODES   = ['SOPORTE/HIBRIDO', 'SIX STRATEGIE', 'HIBRIDO/ZIGZAG', 'SOPORTE PURO', 'SNIPER', 'SNIPER INVERSO'];
 
 const RED_NUMS  = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 const WHEEL_NUMS = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
@@ -295,7 +296,8 @@ function submitNumber(val, silent = false, batch = false) {
                         { top: ag16?.tp,        confidence: ag16?.confidence,   reason: ag16?.reason,   rule: ag16?.rule,   mode: ag16?.mode,   radius: 'N2/N3',        tp: ag16?.tp, cors: ag16?.cor, smallSnipe: ag16?.smallSnipe, bigSnipe: ag16?.bigSnipe },
                         { top: ag1717?.number, confidence: ag1717?.confidence, reason: ag1717?.reason, rule: ag1717?.rule, mode: ag1717?.mode, radius: ag1717?.radius || 'N9', smallSnipe: ag1717?.smallSnipe, bigSnipe: ag1717?.bigSnipe },
                         { top: agN18?.number,  confidence: agN18?.confidence,  reason: agN18?.reason,  rule: agN18?.rule,  mode: agN18?.mode,  radius: agN18?.radius  || 'N9', smallSnipe: agN18?.smallSnipe, bigSnipe: agN18?.bigSnipe },
-                        { top: agCel?.number,  confidence: agCel?.confidence,  reason: agCel?.reason,  rule: agCel?.rule,  mode: agCel?.mode,  radius: agCel?.radius  || 'N4', smallSnipe: agCel?.smallSnipe, bigSnipe: agCel?.bigSnipe }
+                        { top: agCel?.number,  confidence: agCel?.confidence,  reason: agCel?.reason,  rule: agCel?.rule,  mode: agCel?.mode,  radius: agCel?.radius  || 'N4', smallSnipe: agCel?.smallSnipe, bigSnipe: agCel?.bigSnipe },
+                        { top: agCel?.numberInverso, confidence: agCel?.confidence, reason: agCel?.reasonInverso || 'INVERSO', rule: 'SNIPER INVERSO', mode: 'INVERSO', radius: agCel?.radius || 'N9', smallSnipe: agCel?.smallSnipeInverso, bigSnipe: agCel?.bigSnipeInverso }
                     ];
                 }
             } catch(e) { console.error('Predict error:', e); }
