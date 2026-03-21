@@ -641,7 +641,7 @@ let currentLastSpinId = null;
 async function syncData() {
     if (!currentTableId) return;
     try {
-        const r = await fetch(`/api/history/${currentTableId}`);
+        const r = await fetch(`/api/history/${currentTableId}?limit=400`);
         if (!r.ok) return;
         const spins = await r.json();
         
@@ -706,6 +706,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch (e) { console.warn('API not reachable, offline mode.'); }
 
-    // Poll for updates every 5s
-    setInterval(syncData, 5000);
+    // ── SSE: Real-time push instead of polling ──────────────
+    let sseSource = null;
+    let sseBackupInterval = null;
+
+    function connectSSE(tableId) {
+        if (sseSource) { sseSource.close(); sseSource = null; }
+        if (sseBackupInterval) { clearInterval(sseBackupInterval); }
+
+        sseSource = new EventSource(`/api/events/${tableId}`);
+
+        sseSource.onmessage = (e) => {
+            try {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'spin') {
+                    // New spin arrived → sync immediately
+                    syncData();
+                }
+            } catch(_) {}
+        };
+
+        sseSource.onerror = () => {
+            // SSE failed → switch to backup 10s polling
+            sseSource.close();
+            sseSource = null;
+            console.warn('[OFI] SSE disconnected, falling back to polling...');
+            sseBackupInterval = setInterval(syncData, 10000);
+        };
+
+        sseSource.onopen = () => {
+            // SSE connected → stop backup polling if any
+            if (sseBackupInterval) { clearInterval(sseBackupInterval); sseBackupInterval = null; }
+        };
+    }
+
+    connectSSE(currentTableId);
+
+    // Re-connect SSE when table changes
+    tableSelect && tableSelect.addEventListener('change', () => {
+        connectSSE(currentTableId);
+    });
 });
