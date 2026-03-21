@@ -80,7 +80,14 @@ async function startScraper() {
 async function poll() {
     try {
         // ── Fetch from casino.org API ──────────────────────────
-        const response = await axios.get(CASINO_API_URL, {
+        let fetchUrl = CASINO_API_URL;
+        // If we had many 500 errors, try a simpler URL without 'duration'
+        if (consecutiveErrors >= 2 && fetchUrl.includes('duration=')) {
+            fetchUrl = fetchUrl.split('?')[0] + '?page=0&size=10&sort=data.settledAt,desc';
+            console.log(`🔄 [T${TABLE_ID}] Retrying with simplified URL: ${fetchUrl}`);
+        }
+
+        const response = await axios.get(fetchUrl, {
             timeout: 15000,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
@@ -95,7 +102,7 @@ async function poll() {
 
         if (!events.length) {
             console.log(`⚠️ [T${TABLE_ID}] API returned 0 events.`);
-            setTimeout(poll, INTERVAL);
+            setTimeout(poll, INTERVAL + (Math.random() * 3000));
             return;
         }
 
@@ -105,38 +112,25 @@ async function poll() {
         const resolvedEvents = events.filter(e => e.data && e.data.status === 'Resolved');
         
         // 2. Find events NEWER than our last known ID
-        // We look for the index of lastKnownEventId in the full resolved list
         let newEvents = [];
         if (!lastKnownEventId) {
-            // First run: just take the very latest one as seed
             if (resolvedEvents.length > 0) {
                 lastKnownEventId = resolvedEvents[0].data.id || resolvedEvents[0].id;
                 console.log(`📡 [T${TABLE_ID}] Initialized with EventID: ${lastKnownEventId}`);
             }
         } else {
-            // Find where our last ID is. Since list is DESC (newest first), 
-            // everything BEFORE that index is "newer".
             const lastIdx = resolvedEvents.findIndex(e => (e.data?.id || e.id) === lastKnownEventId);
-            
             if (lastIdx === -1) {
-                // If last ID not found in the recent list (maybe we missed too many),
-                // just take the latest one to resync, or take all if list is small.
                 newEvents = [resolvedEvents[0]]; 
             } else if (lastIdx > 0) {
-                // Slice all elements from 0 to lastIdx (exclusive)
                 newEvents = resolvedEvents.slice(0, lastIdx);
             }
         }
 
-        // 3. Post new events in CHRONOLOGICAL order (oldest to newest)
-        // Since original list is newest first, we reverse it.
         const toPost = newEvents.reverse();
-
         for (const ev of toPost) {
             const evId = ev.data?.id || ev.id;
             const num = ev.data?.result?.outcome?.number;
-            
-            // Critical: Extra check to prevent duplicate posts during rapid poll cycles
             if (evId === lastKnownEventId) continue;
 
             if (num !== undefined && num !== null) {
@@ -146,30 +140,30 @@ async function poll() {
                         table_id: parseInt(TABLE_ID),
                         number: parseInt(num),
                         source: 'casino_api',
-                        event_id: evId // Pass ID for server-side guard too
+                        event_id: evId
                     }, { timeout: 10000 });
                     console.log(`✅ [T${TABLE_ID}] Posted: ${num}`);
                     lastKnownEventId = evId; 
                 } catch (postErr) {
                     console.error(`❌ [T${TABLE_ID}] API Post Error: ${postErr.message}`);
-                    break; // Stop and retry next poll if server is down
+                    break;
                 }
             }
         }
 
-
     } catch (fetchErr) {
         consecutiveErrors++;
         console.error(`❌ [T${TABLE_ID}] Casino API Error (${consecutiveErrors}): ${fetchErr.message}`);
-        // Back off on repeated errors
         if (consecutiveErrors > 5) {
             console.log(`🔄 [T${TABLE_ID}] Multiple errors, extending retry interval...`);
-            setTimeout(poll, INTERVAL * 3);
+            setTimeout(poll, (INTERVAL * 3) + (Math.random() * 5000));
             return;
         }
     }
 
-    setTimeout(poll, INTERVAL);
+    // Add jitter (1-5s) to avoid multi-bot synchronization on the same IP
+    const jitter = Math.floor(Math.random() * 4000) + 1000;
+    setTimeout(poll, INTERVAL + jitter);
 }
 
 startScraper();
