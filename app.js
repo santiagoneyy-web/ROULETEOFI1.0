@@ -313,19 +313,36 @@ function renderTravelChart() {
     ctx.fillStyle = 'rgba(192, 144, 255, 0.04)';
     ctx.fillRect(padL, midY, chartW, chartH / 2);
     
-    // ── Main travel line (green) ──
-    ctx.strokeStyle = '#30e090';
-    ctx.lineWidth = 2;
+    // ── Main travel line (Dynamic Coloring) ──
+    ctx.lineWidth = 2.5;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.beginPath();
-    for (let i = 0; i < numPoints; i++) {
-        const x = scaleX(i);
-        const y = scaleY(data[i]);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+    
+    for (let i = 1; i < numPoints; i++) {
+        const x1 = scaleX(i - 1);
+        const y1 = scaleY(data[i - 1]);
+        const x2 = scaleX(i);
+        const y2 = scaleY(data[i]);
+        
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        
+        const val = data[i];
+        const absVal = Math.abs(val);
+        
+        // COLOR LOGIC:
+        // 1. Outside range bands (Peak/Chaos) -> Gold
+        // 2. Positive (CW/DER) -> Green
+        // 3. Negative (CCW/IZQ) -> Red
+        if (val > upperRange || val < lowerRange) {
+            ctx.strokeStyle = '#f5c842'; // Gold para picos (Caos)
+        } else {
+            ctx.strokeStyle = val >= 0 ? '#30e090' : '#f04060'; // Verde vs Rojo
+        }
+        
+        ctx.stroke();
     }
-    ctx.stroke();
     
     // ── Data points (circles on the green line) ──
     for (let i = 0; i < numPoints; i++) {
