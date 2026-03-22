@@ -209,17 +209,17 @@ app.post('/api/spin', async (req, res) => {
                             const title = isSuper ? '⭐⭐ SÚPER ESTABLE' : '⭐ ESTABLE';
                             let msg = `MESA ${table_id}: `;
                             if (allZonesSame) msg += `[${zones[0].toUpperCase()}] `;
-                            if (allDirsSame) msg += `[${dirs[0] === 'CW' ? 'DER' : 'IZQ'}]`;
+                            if (allDirsSame) msg += `[${dirs[0] === 'DERECHA' ? 'DER' : 'IZQ'}]`;
 
                             const safeTitle = isSuper ? 'OFI: SUPER ESTABLE' : 'OFI: ESTABLE';
                             
-                            // Post to Ntfy
-                            axios.post(`https://ntfy.sh/${NTFY_TOPIC}`, msg, {
-                                headers: {
-                                    'Title': safeTitle,
-                                    'Tags': isSuper ? 'fire,slot_machine' : 'star,bar_chart',
-                                    'Priority': isSuper ? 'urgent' : 'high'
-                                }
+                            // Post to Ntfy using JSON API (safest for emojis/UTF-8)
+                            axios.post(`https://ntfy.sh/`, {
+                                topic: NTFY_TOPIC,
+                                title: `OFI: ${title}`,
+                                message: msg,
+                                tags: isSuper ? ['fire', 'slot_machine'] : ['star', 'bar_chart'],
+                                priority: isSuper ? 5 : 4
                             }).catch(err => console.log('Ntfy Err:', err.message));
                             
                             console.log(`🔔 [NTFY SENT] ${title} - ${msg}`);
