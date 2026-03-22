@@ -407,6 +407,72 @@ app.get('/api/stats/:tableId', (req, res) => {
     });
 });
 
+// 🔥 Analytics Endpoint: Find best hours to play
+app.get('/api/trends', async (req, res) => {
+    try {
+        if (!db.getUseMongo()) return res.json({ error: "Solo funciona con MongoDB conectado." });
+        
+        const spins = await Spin.find().sort({ id: 1 }).lean().exec();
+        const hourlyStats = {}; 
+        for(let i=0; i<24; i++) hourlyStats[i] = { hora_peru_colombia: `${i}:00`, super_tendencias: 0, tendencias: 0, total_tiros_evaluados: 0 };
+
+        const tableSpins = {};
+        for (const s of spins) {
+            if (!tableSpins[s.table_id]) tableSpins[s.table_id] = [];
+            tableSpins[s.table_id].push(s);
+        }
+
+        for (const [tId, tSpins] of Object.entries(tableSpins)) {
+            let cd = 0;
+            for (let i = 5; i < tSpins.length; i++) {
+                if (cd > 0) { cd--; continue; }
+
+                const window = tSpins.slice(Math.max(0, i - 4), i + 1);
+                if(window.length < 5) continue;
+                
+                const physList = [];
+                for (let j = 1; j < window.length; j++) {
+                    const prev = window[j-1].number;
+                    const curr = window[j].number;
+                    const p = agent5.getPhysics(prev, curr);
+                    if(p) physList.push({ dir: p.direction, dist: p.distance });
+                }
+
+                if(physList.length < 4) continue;
+                const dirs = physList.map(p => p.dir);
+                const zones = physList.map(p => p.dist);
+
+                const getTrend = (arr, minVal) => {
+                    const counts = {};
+                    arr.forEach(val => { if (val) counts[val] = (counts[val] || 0) + 1; });
+                    for (const [key, c] of Object.entries(counts)) {
+                        if (c >= minVal) return key;
+                    }
+                    return null;
+                };
+
+                const trendDir = getTrend(dirs, 4) || getTrend(dirs.slice(-3), 3);
+                const trendZone = getTrend(zones, 4) || getTrend(zones.slice(-3), 3);
+
+                if (trendDir || trendZone) {
+                    const isSuper = trendDir && trendZone;
+                    let hour = tSpins[i]._id.getTimestamp().getHours();
+                    hour = (hour - 5 + 24) % 24; // Convert UTC to EST/PET/PE
+                    
+                    if (isSuper) hourlyStats[hour].super_tendencias++;
+                    else hourlyStats[hour].tendencias++;
+                    cd = 4;
+                }
+                
+                let h2 = tSpins[i]._id.getTimestamp().getHours();
+                h2 = (h2 - 5 + 24) % 24;
+                hourlyStats[h2].total_tiros_evaluados++;
+            }
+        }
+        res.json(Object.values(hourlyStats).sort((a,b) => (b.super_tendencias + b.tendencias) - (a.super_tendencias + a.tendencias) ));
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ---- Start ----
 const server = app.listen(PORT, '0.0.0.0', async () => {
     console.log(`\n🎰 Roulette Predictor Server running at http://0.0.0.0:${PORT}`);
