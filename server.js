@@ -180,11 +180,9 @@ app.post('/api/spin', async (req, res) => {
 
         // ── NODO 3.5: ALARMAS AL CELULAR (NTFY) ──
         if (numsOnly.length >= 4) {
-            try { // Ensure physics array matches the latest spins including current
-                const recentHist = currentHistory.slice(-3); 
-                // Wait, currentHistory doesn't have the NEW spin yet.
-                // We must use physics and sector we just calculated for the new spin,
-                // and the ones from recentHist for the previous ones.
+            try { 
+                const windowSize = 6;
+                const recentHist = currentHistory.slice(-(windowSize-1));
                 
                 const physList = [];
                 for(let i = 0; i < recentHist.length; i++){
@@ -193,30 +191,53 @@ app.post('/api/spin', async (req, res) => {
                 physList.push({ dir: physics.direction, dist: physics.distance });
 
                 if (physList.length >= 3) {
-                    const last3 = physList.slice(-3); // we check the last 3 for stability
-                    const dirs = last3.map(p => p.dir);
-                    const zones = last3.map(p => p.dist); // 'Big' or 'Small'
+                    const lastW = physList.slice(-windowSize);
+                    const dirs = lastW.map(p => p.dir);
+                    const zones = lastW.map(p => p.dist);
 
-                    const allDirsSame = dirs.every(d => d === dirs[0] && d !== undefined);
-                    const allZonesSame = zones.every(z => z === zones[0] && z !== undefined);
+                    // Regla 1: 3 seguidos perfectos
+                    const last3Dirs = dirs.slice(-3);
+                    const last3Zones = zones.slice(-3);
+                    const strictDir = last3Dirs.every(d => d === last3Dirs[0] && d) ? last3Dirs[0] : null;
+                    const strictZone = last3Zones.every(z => z === last3Zones[0] && z) ? last3Zones[0] : null;
 
-                    if (allDirsSame || allZonesSame) {
+                    // Regla 2: Tendencia Favorable (5 de los últimos 6)
+                    const getTrend = (arr, minVal) => {
+                        if (arr.length < minVal) return null;
+                        const counts = {};
+                        arr.forEach(val => { if (val) counts[val] = (counts[val] || 0) + 1; });
+                        for (const [key, c] of Object.entries(counts)) {
+                            if (c >= minVal) return key;
+                        }
+                        return null;
+                    };
+
+                    const trendDir = getTrend(dirs, 5);
+                    const trendZone = getTrend(zones, 5);
+
+                    const finalDir = strictDir || trendDir;
+                    const finalZone = strictZone || trendZone;
+
+                    if (finalDir || finalZone) {
                         const lastAlertSpin = lastNtfyAlerts[table_id] || 0;
-                        if (numsOnly.length > lastAlertSpin + 2) {
-                            lastNtfyAlerts[table_id] = numsOnly.length; // Anti-spam
+                        if (numsOnly.length > lastAlertSpin + 3) { // 3 spins anti-spam
+                            lastNtfyAlerts[table_id] = numsOnly.length; 
 
-                            const isSuper = allDirsSame && allZonesSame;
-                            const title = isSuper ? '⭐⭐ SÚPER ESTABLE' : '⭐ ESTABLE';
+                            const isSuper = finalDir && finalZone;
+                            // Si logró cumplirse la regla "strict", le llamamos ESTABLE, sino TENDENCIA
+                            const isTendency = (!strictDir && trendDir) || (!strictZone && trendZone);
+                            let title = isSuper ? '⭐⭐ SÚPER ESTABLE' : '⭐ ESTABLE';
+                            if (isTendency && !isSuper) title = '⭐ TENDENCIA FAVORABLE';
+                            if (isTendency && isSuper) title = '⭐⭐ SÚPER TENDENCIA';
+
                             let msg = `MESA ${table_id}: `;
-                            if (allZonesSame) msg += `[${zones[0].toUpperCase()}] `;
-                            if (allDirsSame) msg += `[${dirs[0] === 'DERECHA' ? 'DER' : 'IZQ'}]`;
+                            if (finalZone) msg += `[${finalZone.toUpperCase()}] `;
+                            if (finalDir) msg += `[${finalDir === 'DERECHA' ? 'DER' : 'IZQ'}]`;
 
-                            const safeTitle = isSuper ? 'OFI: SUPER ESTABLE' : 'OFI: ESTABLE';
-                            
-                            // Post to Ntfy using JSON API (safest for emojis/UTF-8)
+                            // Post to Ntfy using JSON API
                             axios.post(`https://ntfy.sh/`, {
                                 topic: NTFY_TOPIC,
-                                title: `OFI: ${title}`,
+                                title: title,
                                 message: msg,
                                 tags: isSuper ? ['fire', 'slot_machine'] : ['star', 'bar_chart'],
                                 priority: isSuper ? 5 : 4
