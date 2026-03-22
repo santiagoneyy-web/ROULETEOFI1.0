@@ -9,8 +9,11 @@ const db      = require('./database');
 const Spin    = require('./models/Spin'); // MongoDB Model
 const agent5  = require('./agent5');      // Autonomous AI & Physics
 const predictor = require('./predictor'); // Agents 1-4
+const axios     = require('axios');
 
 const app  = express();
+const NTFY_TOPIC = process.env.NTFY_TOPIC || 'ofi_santi_alerts';
+const lastNtfyAlerts = {}; // { tableId: spinCount }
 
 // ── SSE: broadcast to all clients listening per table ──────
 const sseClients = {}; // { tableId: [res, res, ...] }
@@ -173,6 +176,55 @@ app.post('/api/spin', async (req, res) => {
     } else if (numsOnly.length < 50) {
         console.log(`⏳ [Célula] Learning mode: (${numsOnly.length}/50) spins.`);
     }
+        }
+
+        // ── NODO 3.5: ALARMAS AL CELULAR (NTFY) ──
+        if (numsOnly.length >= 4) {
+            try { // Ensure physics array matches the latest spins including current
+                const recentHist = currentHistory.slice(-3); 
+                // Wait, currentHistory doesn't have the NEW spin yet.
+                // We must use physics and sector we just calculated for the new spin,
+                // and the ones from recentHist for the previous ones.
+                
+                const physList = [];
+                for(let i = 0; i < recentHist.length; i++){
+                    physList.push({ dir: recentHist[i].direction, dist: recentHist[i].distance });
+                }
+                physList.push({ dir: physics.direction, dist: physics.distance });
+
+                if (physList.length >= 3) {
+                    const last3 = physList.slice(-3); // we check the last 3 for stability
+                    const dirs = last3.map(p => p.dir);
+                    const zones = last3.map(p => p.dist); // 'Big' or 'Small'
+
+                    const allDirsSame = dirs.every(d => d === dirs[0] && d !== undefined);
+                    const allZonesSame = zones.every(z => z === zones[0] && z !== undefined);
+
+                    if (allDirsSame || allZonesSame) {
+                        const lastAlertSpin = lastNtfyAlerts[table_id] || 0;
+                        if (numsOnly.length > lastAlertSpin + 2) {
+                            lastNtfyAlerts[table_id] = numsOnly.length; // Anti-spam
+
+                            const isSuper = allDirsSame && allZonesSame;
+                            const title = isSuper ? '⭐⭐ SÚPER ESTABLE' : '⭐ ESTABLE';
+                            let msg = `MESA ${table_id}: `;
+                            if (allZonesSame) msg += `[${zones[0].toUpperCase()}] `;
+                            if (allDirsSame) msg += `[${dirs[0] === 'CW' ? 'DER' : 'IZQ'}]`;
+
+                            // Post to Ntfy
+                            axios.post(`https://ntfy.sh/${NTFY_TOPIC}`, msg, {
+                                headers: {
+                                    'Title': `OFI: ${title}`,
+                                    'Tags': isSuper ? 'fire,slot_machine' : 'bar_chart',
+                                    'Priority': isSuper ? 'urgent' : 'high'
+                                }
+                            }).catch(err => console.log('Ntfy Err:', err.message));
+                            
+                            console.log(`🔔 [NTFY SENT] ${title} - ${msg}`);
+                        }
+                    }
+                }
+            } catch(e) { console.error('Ntfy check err:', e); }
         }
 
         // ── NODO 4: SINCRONIZACIÓN (Guardar la inyección enriquecida) ──
