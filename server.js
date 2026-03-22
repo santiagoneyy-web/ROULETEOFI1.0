@@ -13,7 +13,7 @@ const axios     = require('axios');
 
 const app  = express();
 const NTFY_TOPIC = process.env.NTFY_TOPIC || 'ofi_santi_alerts';
-const lastNtfyAlerts = {}; // { tableId: spinCount }
+const ntfyCooldowns = {}; // { tableId: remaining_spins_before_next_alert }
 
 // ── SSE: broadcast to all clients listening per table ──────
 const sseClients = {}; // { tableId: [res, res, ...] }
@@ -89,6 +89,11 @@ app.post('/api/spin', async (req, res) => {
     const { table_id, number, source, direction } = req.body;
     if (table_id == null || number == null) return res.status(400).json({ error: 'table_id and number required' });
     if (number < 0 || number > 36) return res.status(400).json({ error: 'number must be 0-36' });
+
+    // Decrement Ntfy cooldown
+    if (ntfyCooldowns[table_id] && ntfyCooldowns[table_id] > 0) {
+        ntfyCooldowns[table_id]--;
+    }
 
     try {
         const isMongo = db.getUseMongo();
@@ -219,9 +224,9 @@ app.post('/api/spin', async (req, res) => {
                     const finalZone = strictZone || trendZone;
 
                     if (finalDir || finalZone) {
-                        const lastAlertSpin = lastNtfyAlerts[table_id] || 0;
-                        if (numsOnly.length > lastAlertSpin + 3) { // 3 spins anti-spam
-                            lastNtfyAlerts[table_id] = numsOnly.length; 
+                        const cooldown = ntfyCooldowns[table_id] || 0;
+                        if (cooldown <= 0) { 
+                            ntfyCooldowns[table_id] = 4; // 4 spins cooldown to avoid spam on the exact same trend bounce
 
                             const isSuper = finalDir && finalZone;
                             // Si logró cumplirse la regla "strict", le llamamos ESTABLE, sino TENDENCIA
