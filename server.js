@@ -211,11 +211,13 @@ app.post('/api/spin', async (req, res) => {
                             if (allZonesSame) msg += `[${zones[0].toUpperCase()}] `;
                             if (allDirsSame) msg += `[${dirs[0] === 'CW' ? 'DER' : 'IZQ'}]`;
 
+                            const safeTitle = isSuper ? 'OFI: SUPER ESTABLE' : 'OFI: ESTABLE';
+                            
                             // Post to Ntfy
                             axios.post(`https://ntfy.sh/${NTFY_TOPIC}`, msg, {
                                 headers: {
-                                    'Title': `OFI: ${title}`,
-                                    'Tags': isSuper ? 'fire,slot_machine' : 'bar_chart',
+                                    'Title': safeTitle,
+                                    'Tags': isSuper ? 'fire,slot_machine' : 'star,bar_chart',
                                     'Priority': isSuper ? 'urgent' : 'high'
                                 }
                             }).catch(err => console.log('Ntfy Err:', err.message));
