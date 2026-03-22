@@ -181,7 +181,7 @@ app.post('/api/spin', async (req, res) => {
         // ── NODO 3.5: ALARMAS AL CELULAR (NTFY) ──
         if (numsOnly.length >= 4) {
             try { 
-                const windowSize = 6;
+                const windowSize = 5;
                 const recentHist = currentHistory.slice(-(windowSize-1));
                 
                 const physList = [];
@@ -201,7 +201,7 @@ app.post('/api/spin', async (req, res) => {
                     const strictDir = last3Dirs.every(d => d === last3Dirs[0] && d) ? last3Dirs[0] : null;
                     const strictZone = last3Zones.every(z => z === last3Zones[0] && z) ? last3Zones[0] : null;
 
-                    // Regla 2: Tendencia Favorable (5 de los últimos 6)
+                    // Regla 2: Tendencia Favorable (4 de los últimos 5)
                     const getTrend = (arr, minVal) => {
                         if (arr.length < minVal) return null;
                         const counts = {};
@@ -212,8 +212,8 @@ app.post('/api/spin', async (req, res) => {
                         return null;
                     };
 
-                    const trendDir = getTrend(dirs, 5);
-                    const trendZone = getTrend(zones, 5);
+                    const trendDir = getTrend(dirs, 4);
+                    const trendZone = getTrend(zones, 4);
 
                     const finalDir = strictDir || trendDir;
                     const finalZone = strictZone || trendZone;
