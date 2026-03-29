@@ -87,17 +87,25 @@ async function poll() {
             console.log(`🔄 [T${TABLE_ID}] Retrying with simplified URL: ${fetchUrl}`);
         }
 
-        const response = await axios.get(fetchUrl, {
-            timeout: 15000,
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        const response = await fetch(fetchUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
-                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
                 'Referer': TARGET_URL,
                 'Origin': 'https://www.casino.org'
-            }
+            },
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
-        const body = response.data;
+        if (!response.ok) {
+            throw new Error(`Request failed with status code ${response.status}`);
+        }
+
+        const body = await response.json();
         let events = Array.isArray(body) ? body : (body?.content || []);
 
         if (!events.length) {
