@@ -116,7 +116,13 @@ app.post('/api/spin', async (req, res) => {
         const lastNumber = numsOnly.length > 0 ? numsOnly[numsOnly.length - 1] : null;
 
         // --- DUPLICATE GUARD ---
-        if (number === lastNumber && source === 'public_scraper') {
+        if (req.body.event_id) {
+            const isDuplicate = currentHistory.some(s => s.event_id === req.body.event_id);
+            if (isDuplicate) {
+                console.log(`[DUPLICATE IGNORED] Table ${table_id}, Event ${req.body.event_id}`);
+                return res.json({ id: 'ignored', table_id, number, note: 'Duplicate by event_id' });
+            }
+        } else if (number === lastNumber && source === 'public_scraper') {
             console.log(`[DUPLICATE IGNORED] Table ${table_id}, Number ${number} (Source: ${source})`);
             return res.json({ id: 'ignored', table_id, number, source, note: 'Duplicate ignored' });
         }
@@ -276,9 +282,9 @@ app.post('/api/spin', async (req, res) => {
             res.json(newSpin);
         } else {
             // Fallback
-            db.addSpin(table_id, number, source || 'bot', (err, id) => {
+            db.addSpin(table_id, number, source || 'bot', { event_id: req.body.event_id }, (err, id) => {
                 if (err) return res.status(500).json({ error: err.message });
-                res.json({ id, table_id, number, source, note: 'Saved to fallback JSON without rich predictions' });
+                res.json({ id, table_id, number, source, note: 'Saved to fallback JSON' });
             });
         }
 
@@ -405,6 +411,11 @@ app.get('/api/stats/:tableId', (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(row);
     });
+});
+
+// Catch-all: Siempre servir el frontend para cualquier ruta no reconocida
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // 🔥 Analytics Endpoint: Find best hours to play

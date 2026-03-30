@@ -546,3 +546,108 @@ canvas#wheel-canvas { width: 130px; height: 130px; }
   bottom: 14px; right: 14px;
   color: #c090ff;
 }
+
+/* ══════════ DOZENS TRACKER ══════════ */
+.dozens-tracker {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0 8px;
+}
+.dozen-ball {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 700;
+  transition: all 0.3s ease;
+  line-height: 1.2;
+  text-align: center;
+}
+/* Solid Dominant (Red Glow) */
+.dozen-ball.dominant {
+  border-color: var(--red);
+  color: #fff;
+  background: rgba(240, 64, 96, 0.2);
+  box-shadow: 0 0 15px rgba(240, 64, 96, 0.6);
+  transform: scale(1.1);
+}
+/* Blinking Transition (Golden Pulse) */
+.dozen-ball.dominant-transition {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(240, 192, 64, 0.1);
+  animation: pulse-transition 0.8s infinite alternate;
+  transform: scale(1.05);
+}
+
+@keyframes pulse-transition {
+  from { box-shadow: 0 0 5px rgba(240, 192, 64, 0.3); opacity: 0.8; }
+  to { box-shadow: 0 0 15px rgba(240, 192, 64, 0.7); opacity: 1; }
+}
+
+.dozens-info {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text2);
+  padding: 4px 14px 8px;
+}
+
+.dozens-transition-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 14px 6px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.transition-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.transition-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.transition-badge.active {
+  color: var(--accent);
+  border-color: rgba(0,229,200,0.35);
+  background: rgba(0,229,200,0.08);
+}
+.transition-arrow {
+  font-size: 12px;
+  color: var(--gold);
+}
+.transition-status {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.transition-status.warning {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+.transition-status.stable {
+  background: rgba(40, 167, 69, 0.15);
+  color: #28a745;
+}

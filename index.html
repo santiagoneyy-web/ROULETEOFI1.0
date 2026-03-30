@@ -32,6 +32,28 @@
         </div>
     </section>
 
+    <!-- ═══ DOCENAS DOMINANTES (Added) ═══ -->
+    <section class="agent-card" id="panel-dozens" style="margin-bottom: 2px; padding-bottom: 0; background: var(--card2);">
+        <div class="agent-card-header">
+            <span class="agent-icon">👑</span>
+            <span class="agent-card-name">DOCENAS DOMINANTES</span>
+            <button class="wipe-btn" id="wipe-btn" style="margin-left: auto; background: rgba(127,29,29,0.5); color: #fca5a5; border: 1px solid rgba(153,27,27,0.6); border-radius: 4px; padding: 2px 8px; font-size: 10px; font-family: var(--mono); cursor: pointer;" onclick="wipeData()">🗑 WIPE</button>
+        </div>
+        <div class="dozens-tracker">
+            <div class="dozen-ball" id="dz-1">1st<br>1-12</div>
+            <div class="dozen-ball" id="dz-2">2nd<br>13-24</div>
+            <div class="dozen-ball" id="dz-3">3rd<br>25-36</div>
+        </div>
+        <div class="dozens-transition-row">
+            <span class="transition-label">PREV:</span>
+            <span class="transition-badge" id="doc-memory-badge">--</span>
+            <span class="transition-arrow" id="doc-transition-arrow">→</span>
+            <span class="transition-badge active" id="doc-current-badge">--</span>
+            <span class="transition-status" id="doc-transition-status">ESTABLE</span>
+        </div>
+        <div class="dozens-info" id="doc-info">Analizando...</div>
+    </section>
+
     <!-- ═══ AGENT TABS ═══ -->
     <nav class="agent-tab-bar" id="strat-tabs"></nav>
 

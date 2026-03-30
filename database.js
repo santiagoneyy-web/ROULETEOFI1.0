@@ -198,18 +198,26 @@ async function addSpin(tableId, number, source, extra = {}, cb) {
             cb(null, id);
         } catch (e) { cb(e); }
     } else {
+        if (extra && extra.event_id) {
+            const exists = fallbackData.spins.find(s => s.table_id == tableId && s.event_id === extra.event_id);
+            if (exists) {
+                if (typeof cb === 'function') cb(null, exists.id);
+                return;
+            }
+        }
         const id = fallbackData.spins.length > 0 ? Math.max(...fallbackData.spins.map(s => s.id)) + 1 : 1;
         const newSpin = {
             id,
             table_id: parseInt(tableId),
             number: parseInt(number),
             source: source || 'manual',
+            event_id: extra ? extra.event_id : null,
             timestamp: new Date().toISOString()
         };
         fallbackData.spins.push(newSpin);
         if (fallbackData.spins.length > 5000) fallbackData.spins.shift(); 
         saveFallback();
-        cb(null, id);
+        if (typeof cb === 'function') cb(null, id);
     }
 }
 

@@ -24,6 +24,11 @@ const WHEEL_NUMS = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,
 
 let currentTableId = null;
 
+// ─── DOZENS STATE ──────────────────────────────────────────────
+let dzCurrent = [];
+let dzPrevious = [];
+let dzSpinsSinceChange = 0;
+
 function calcDist(from, to) {
     const i1 = WHEEL_NUMS.indexOf(from);
     const i2 = WHEEL_NUMS.indexOf(to);
@@ -32,6 +37,24 @@ function calcDist(from, to) {
     if (d > 18) d -= 37;
     if (d < -18) d += 37;
     return d;
+}
+
+function wipeData() {
+    if (!confirm('⚠️ ¿BORRAR TODOS LOS DATOS?')) return;
+    const tableId = currentTableId;
+    if (!tableId) { alert('Selecciona una mesa primero'); return; }
+    fetch('/api/history/' + tableId, { method: 'DELETE' })
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(() => {
+            history.length=0; 
+            iaSignalsHistory.forEach(h => h.length = 0);
+            dzCurrent=[]; dzPrevious=[]; dzSpinsSinceChange=0;
+            renderSignalsPanel(lastIaSignals);
+            alert('✅ Datos borrados.');
+        }).catch(() => { 
+            history.length=0; 
+            renderSignalsPanel(lastIaSignals);
+        });
 }
 
 // ─── RENDER: AGENT TABS ────────────────────────────────────
@@ -185,7 +208,128 @@ function renderWheelAndHistory() {
 function renderSignalsPanel(signals) {
     renderTabs();
     renderAgentCard(signals);
+    renderDozens(); // Added dozens rendering
     renderWheelAndHistory();
+}
+
+function renderDozens() {
+    try {
+        if (history.length < 18) {
+            document.getElementById('doc-info').innerText = 'ESPERANDO DATOS (Min 18)...';
+            return;
+        }
+
+        // Map everything to dozens first.
+        const dozens = history.map(n => {
+            if (n === 0) return 0;
+            if (n >= 1 && n <= 12) return 1;
+            if (n >= 13 && n <= 24) return 2;
+            return 3;
+        });
+
+        let cur = [];
+        let prev = [];
+        let spins = 0;
+
+        // Replay history to build accurate State Machine for Dozens
+        for (let i = 18; i <= dozens.length; i++) {
+            const window = dozens.slice(i - 18, i).filter(d => d !== 0);
+            if (window.length === 0) continue;
+
+            const counts = {1:0, 2:0, 3:0};
+            window.forEach(d => counts[d]++);
+            
+            const sorted = [1,2,3].sort((a,b) => counts[b] - counts[a]);
+            let top2 = [sorted[0], sorted[1]].sort();
+
+            if (cur.length === 0) {
+                cur = top2;
+                spins = 0;
+            } else {
+                // STICKY LOGIC: Only switch if the "outsider" dozen has significantly 
+                // more momentum than a current dominant member.
+                const outsider = [1,2,3].find(d => !cur.includes(d));
+                const dom1 = cur[0]; 
+                const dom2 = cur[1];
+                
+                // If outsider is now strictly stronger than at least ONE dominant member
+                const shouldSwitch = (counts[outsider] > counts[dom1] + 1) || (counts[outsider] > counts[dom2] + 1);
+
+                if (shouldSwitch && JSON.stringify(top2) !== JSON.stringify(cur)) {
+                    // Start TRANSITION
+                    prev = [...cur];
+                    cur = top2;
+                    spins = 0;
+                } else {
+                    spins++;
+                }
+            }
+        }
+        
+        // Sync to global vars
+        dzCurrent = cur;
+        dzPrevious = prev;
+        dzSpinsSinceChange = spins;
+
+        // UI: Dozen balls highlight logic (REFINED)
+        [1,2,3].forEach(dz => {
+            const el = document.getElementById(`dz-${dz}`);
+            if(!el) return;
+            
+            el.classList.remove('dominant', 'dominant-transition');
+            
+            if (spins > 10) {
+                // STABLE MODE: Highlight the current (new) dominants
+                if (cur.includes(dz)) el.classList.add('dominant');
+            } else {
+                // TRANSITION/CONSOLIDATION MODE:
+                // Special case: blink the PREVIOUS dominants until stability is reached
+                if (prev.length > 0) {
+                   if (prev.includes(dz)) el.classList.add('dominant-transition');
+                } else {
+                   // Initial state (no previous) -> just highlight current
+                   if (cur.includes(dz)) el.classList.add('dominant');
+                }
+            }
+        });
+
+        // UI: Transition row
+        const prevBadge    = document.getElementById('doc-memory-badge');
+        const currBadge    = document.getElementById('doc-current-badge');
+        const arrow        = document.getElementById('doc-transition-arrow');
+        const statusEl     = document.getElementById('doc-transition-status');
+        const infoEl       = document.getElementById('doc-info');
+
+        const fmtDoz = arr => arr.length > 0 ? arr.map(d => d + '°').join(' & ') : '--';
+
+        if (prevBadge) prevBadge.innerText = fmtDoz(prev);
+        if (currBadge) currBadge.innerText = fmtDoz(cur);
+
+        // Transition status indicator
+        if (statusEl) {
+            statusEl.className = 'transition-status'; // reset
+            if (spins <= 5 && prev.length > 0) {
+                statusEl.innerText = `⚠️ TRANSICIÓN (+${spins}t)`;
+                statusEl.classList.add('warning');
+                if (arrow) arrow.innerText = '→';
+            } else if (spins <= 10) {
+                statusEl.innerText = `CONSOLIDANDO (+${spins}t)`;
+                statusEl.classList.add('warning');
+                if (arrow) arrow.innerText = '→';
+            } else {
+                statusEl.innerText = `✅ ESTABLE (${spins}t)`;
+                statusEl.classList.add('stable');
+                if (arrow) arrow.innerText = '•';
+            }
+        }
+
+        if (infoEl) {
+            infoEl.innerText = `Ventana 18: Dom· ${fmtDoz(cur)}`;
+        }
+
+    } catch (err) { 
+        console.error('Error in renderDozens:', err); 
+    }
 }
 
 // ─── RENDER: TRAVEL CHART (Shadow Roulette Style) ──────────
